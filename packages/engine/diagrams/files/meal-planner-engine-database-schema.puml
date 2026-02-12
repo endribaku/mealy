@@ -1,0 +1,237 @@
+@startuml Meal Planner Engine - Database Schema
+
+!theme plain
+skinparam linetype ortho
+
+title Meal Planner Engine - Database Schema (Supabase PostgreSQL)
+
+entity "users" {
+  **Primary Key**
+  --
+  * id : UUID <<PK>>
+  --
+  **Core Fields**
+  --
+  * email : TEXT <<UNIQUE>>
+  * name : TEXT
+  * diet : TEXT
+  * is_active : BOOLEAN
+  --
+  **JSONB Columns**
+  --
+  * profile : JSONB
+    ├─ email
+    ├─ name
+    ├─ diet
+    ├─ allergies[]
+    ├─ calorieTarget
+    ├─ cookingSkill
+    ├─ householdSize
+    ├─ measurementSystem
+    ├─ goals[]
+    ├─ preferences{}
+    ├─ createdAt
+    └─ updatedAt
+  --
+  * learned_preferences : JSONB
+    ├─ dislikedIngredients[]
+    ├─ dislikedCuisines[]
+    ├─ favoriteCuisines[]
+    ├─ favoriteIngredients[]
+    ├─ spiceLevel
+    ├─ preferredComplexity
+    ├─ patterns{}
+    └─ lastUpdated
+  --
+  * metadata : JSONB
+    ├─ totalMealPlansGenerated
+    ├─ totalMealsGenerated
+    ├─ totalRegenerations
+    ├─ totalRatings
+    ├─ averageRating
+    ├─ totalMealsCooked
+    ├─ totalRecipesViewed
+    ├─ lastLoginAt
+    ├─ lastMealPlanAt
+    ├─ createdAt
+    └─ updatedAt
+  --
+  * dietary_restrictions : JSONB
+    ├─ allergies[]
+    │  ├─ name
+    │  ├─ severity
+    │  └─ notes
+    ├─ intolerances[]
+    └─ medicalConditions[]
+  --
+  * subscription : JSONB
+    ├─ tier
+    ├─ status
+    ├─ expiresAt
+    └─ features[]
+  --
+  * notifications : JSONB
+    ├─ email
+    ├─ push
+    ├─ sms
+    └─ preferences{}
+  --
+  **Timestamps**
+  --
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+  --
+  **Indexes**
+  --
+  idx_users_email
+  idx_users_is_active
+  idx_users_diet
+  idx_users_profile_cooking_skill (JSONB)
+  idx_users_favorite_cuisines (GIN)
+  idx_users_disliked_ingredients (GIN)
+}
+
+entity "sessions" {
+  **Primary Key**
+  --
+  * id : UUID <<PK>>
+  --
+  **Foreign Keys**
+  --
+  * user_id : UUID <<FK>>
+  --
+  **JSONB Columns**
+  --
+  * current_meal_plan : JSONB
+    ├─ days[]
+    │  ├─ dayNumber
+    │  └─ meals{}
+    │     ├─ breakfast
+    │     ├─ lunch
+    │     └─ dinner
+    └─ nutritionSummary{}
+       ├─ avgDailyCalories
+       └─ avgProtein
+  --
+  * modifications : JSONB[]
+    ├─ timestamp
+    ├─ action
+    ├─ mealId
+    └─ reason
+  --
+  * temporary_constraints : JSONB[]
+  --
+  **Status**
+  --
+  * status : TEXT
+    Values: 'active', 'confirmed',
+            'expired', 'cancelled'
+  --
+  **Timestamps (TEXT)**
+  --
+  created_at : TEXT (ISO 8601)
+  updated_at : TEXT (ISO 8601)
+  expires_at : TEXT (ISO 8601)
+  --
+  **Indexes**
+  --
+  idx_sessions_user_id
+  idx_sessions_status
+  idx_sessions_expires_at
+  idx_sessions_modifications (GIN)
+}
+
+entity "meal_plans" {
+  **Primary Key**
+  --
+  * id : UUID <<PK>>
+  --
+  **Foreign Keys**
+  --
+  * user_id : UUID <<FK>>
+  * session_id : UUID <<FK>> (nullable)
+  --
+  **JSONB Column**
+  --
+  * plan : JSONB
+    └─ (Same structure as
+       sessions.current_meal_plan)
+  --
+  **Metadata**
+  --
+  plan_name : TEXT (nullable)
+  number_of_days : INTEGER
+  * status : TEXT
+    Values: 'active', 'completed',
+            'cancelled'
+  --
+  **Timestamps**
+  --
+  confirmed_at : TIMESTAMPTZ
+  created_at : TIMESTAMPTZ
+  --
+  **Indexes**
+  --
+  idx_meal_plans_user_id
+  idx_meal_plans_session_id
+  idx_meal_plans_created_at
+  idx_meal_plans_status
+}
+
+' Relationships
+users ||--o{ sessions : "has many"
+users ||--o{ meal_plans : "has many"
+sessions ||--o| meal_plans : "may have"
+
+note right of users
+  **CASCADE Rules:**
+  When user deleted:
+  • All sessions deleted (CASCADE)
+  • All meal_plans deleted (CASCADE)
+  
+  **RLS (Row Level Security):**
+  Users can only access their own data
+  
+  **Soft Delete:**
+  is_active = false (keeps data)
+  Hard delete available for GDPR
+end note
+
+note right of sessions
+  **Expiration:**
+  Auto-expires after 7 days
+  
+  **Cleanup:**
+  Cron job removes expired sessions
+  
+  **Purpose:**
+  Temporary working storage
+  for meal plan generation
+end note
+
+note right of meal_plans
+  **Purpose:**
+  Permanent storage of confirmed
+  meal plans (user's history)
+  
+  **Relationship:**
+  Links back to session that
+  created it (for audit trail)
+end note
+
+legend right
+  **Database: Supabase (PostgreSQL)**
+  
+  **Key Design Decisions:**
+  • JSONB for flexibility
+  • String timestamps for consistency
+  • GIN indexes for array queries
+  • CASCADE deletes for cleanup
+  • Hard delete for GDPR compliance
+  
+  **File Location:**
+  📁 src/database/
+     supabase-schema-aligned.sql
+endlegend
+
+@enduml

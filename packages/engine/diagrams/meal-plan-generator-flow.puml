@@ -1,0 +1,103 @@
+@startuml Meal Plan Generator Flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+skinparam ArrowColor #333333
+
+title Meal Plan Generator - Complete Flow
+
+start
+
+:User calls generateMealPlan(userId, sessionId?, options);
+
+:Start timer;
+
+partition "Step 1: Build Context" {
+  :Call ContextBuilder.buildFullContext(userId, sessionId);
+  
+  if (User exists?) then (yes)
+    :Extract User Context\n- Hard Constraints\n- Learned Preferences\n- Metadata;
+  else (no)
+    :Throw UserNotFoundError;
+    stop
+  endif
+  
+  if (SessionId provided?) then (yes)
+    if (Session exists?) then (yes)
+      :Extract Session Context\n- Modifications\n- Temporary Constraints;
+    else (no)
+      :Throw SessionNotFoundError;
+      stop
+    endif
+  else (no)
+    :Set Session Context = null\n(First generation);
+  endif
+  
+  :Combine contexts\nEstimate tokens;
+  :Log: Context built with X tokens;
+}
+
+partition "Step 2: Build Prompt" {
+  if (First-time user?) then (yes)
+    :Add special instructions:\n"Make this memorable";
+  endif
+  
+  :Call PromptBuilder.buildPrompt();
+  :Create System Message\n- Role definition\n- JSON schema\n- Constraints\n- Quality guidelines;
+  :Create User Message\n- User context\n- Session feedback\n- Special instructions;
+}
+
+partition "Step 3: Call AI" {
+  :Determine provider\n(default: OpenAI);
+  :Get temperature from config;
+  :Get maxTokens from config;
+  
+  if (Provider?) then (OpenAI)
+    :model = openai(gpt-4o);
+  else (Anthropic)
+    :model = anthropic(claude-sonnet-4);
+  endif
+  
+  :Log: Using X model;
+  
+  :Call generateText()\n- System message\n- User message\n- Temperature\n- Max output tokens;
+  
+  note right
+    API Call happens here
+    Takes 8-15 seconds
+  end note
+  
+  :Receive AI response;
+}
+
+partition "Step 4: Validate & Parse" {
+  :Clean response text\n- Remove markdown blocks\n- Trim whitespace;
+  
+  :Parse JSON;
+  
+  if (Valid JSON?) then (yes)
+    :Validate against MealPlanSchema\n(Zod validation);
+    
+    if (Schema valid?) then (yes)
+      :Log: Meal plan validated;
+      :Extract validated MealPlan;
+    else (no)
+      :Log validation errors;
+      :Throw validation error;
+      stop
+    endif
+  else (no)
+    :Log parse error;
+    :Throw JSON parse error;
+    stop
+  endif
+}
+
+:Calculate generation time;
+:Log: Meal plan generated;
+
+:Return GenerationResult\n- mealPlan\n- tokensUsed\n- provider\n- generationTime;
+
+stop
+
+@enduml

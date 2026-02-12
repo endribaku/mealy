@@ -1,0 +1,223 @@
+@startuml Meal Planner Engine - Complete Pipeline
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+skinparam ArrowColor #2C3E50
+skinparam ActorBorderColor #2C3E50
+skinparam DatabaseBorderColor #E74C3C
+skinparam CollectionsBorderColor #3498DB
+skinparam ComponentBorderColor #27AE60
+
+title Meal Planner Engine - Complete Pipeline Flow
+
+actor "User/API" as user
+participant "MealPlanGenerator" as generator
+participant "ContextBuilder" as context
+participant "SupabaseDataAccess" as data
+database "Supabase DB" as db
+collections "AI Provider\n(OpenAI/Anthropic)" as ai
+participant "PromptBuilder" as prompt
+participant "Validator" as validator
+collections "Response" as response
+
+== Initialization ==
+user -> generator : new MealPlanGenerator(dataAccess)
+note right
+  📁 src/core/meal-plan/
+     meal-plan-generator.ts
+end note
+
+== Meal Plan Generation ==
+user -> generator : generateMealPlan(userId, sessionId?, options?)
+activate generator
+
+generator -> context : buildFullContext(userId, sessionId)
+activate context
+note right of context
+  📁 src/core/context-builder.ts
+  
+  Extracts user preferences
+  and session history
+end note
+
+== Fetch User Data ==
+context -> data : findUserById(userId)
+activate data
+note right of data
+  📁 src/data/
+     supabase-data-access.ts
+end note
+
+data -> db : SELECT * FROM users WHERE id = userId
+activate db
+note right of db
+  🗄️ PostgreSQL Database
+  
+  Tables:
+  • users
+  • sessions
+  • meal_plans
+end note
+
+db --> data : User row (JSONB columns)
+deactivate db
+
+data -> data : deserializeUser(row)
+note right
+  Convert JSONB to TypeScript
+  Validate with Zod schemas
+end note
+
+data --> context : User object
+deactivate data
+
+== Fetch Session Data (if exists) ==
+alt sessionId provided
+  context -> data : findSessionById(sessionId)
+  activate data
+  
+  data -> db : SELECT * FROM sessions WHERE id = sessionId
+  activate db
+  db --> data : Session row
+  deactivate db
+  
+  data -> data : deserializeSession(row)
+  data --> context : Session object
+  deactivate data
+end
+
+== Build Context ==
+context -> context : buildUserContext(user)
+note right
+  Extract:
+  • hardConstraints
+  • learnedPreferences
+  • metadata
+  • preferences
+  • goals
+end note
+
+context -> context : buildSessionContext(session)
+note right
+  Extract:
+  • currentMealPlan
+  • modifications
+  • temporaryConstraints
+end note
+
+context -> context : estimateTokens(userContext, sessionContext)
+context --> generator : FullContext { user, session, estimatedTokens }
+deactivate context
+
+== Build AI Prompt ==
+generator -> prompt : buildPrompt(context, promptConfig, specialInstructions)
+activate prompt
+note right of prompt
+  📁 src/core/meal-plan/
+     prompt-builder.ts
+end note
+
+prompt -> prompt : Build system message
+note right
+  Include:
+  • Role definition
+  • Output format instructions
+  • Nutrition guidelines
+end note
+
+prompt -> prompt : Build user message
+note right
+  Include:
+  • User context (preferences)
+  • Prompt config (days, meals)
+  • Special instructions
+end note
+
+prompt --> generator : { systemMessage, userMessage }
+deactivate prompt
+
+== Call AI Provider ==
+generator -> ai : generateText(model, messages, temperature, schema)
+activate ai
+note right of ai
+  Using Vercel AI SDK
+  
+  Providers:
+  • OpenAI (gpt-4)
+  • Anthropic (claude-sonnet-4)
+  
+  With structured output:
+  Output.object({ schema: MealPlanSchema })
+end note
+
+ai -> ai : Generate meal plan JSON
+note right
+  AI generates:
+  {
+    days: [...],
+    nutritionSummary: {...}
+  }
+end note
+
+ai --> generator : { output, usage, finishReason }
+deactivate ai
+
+== Validate Response ==
+generator -> validator : MealPlanSchema.parse(output)
+activate validator
+note right of validator
+  📁 src/core/schemas/schemas.ts
+  
+  Validates:
+  • Days structure
+  • Meal schema
+  • Nutrition data
+  • Ingredients
+end note
+
+validator --> generator : Validated MealPlan
+deactivate validator
+
+== Save to Session ==
+generator -> data : updateSessionMealPlan(sessionId, mealPlan)
+activate data
+
+data -> db : UPDATE sessions\nSET current_meal_plan = mealPlan,\n    updated_at = NOW()\nWHERE id = sessionId
+activate db
+db --> data : Success
+deactivate db
+
+data --> generator : Updated Session
+deactivate data
+
+== Update User Metadata ==
+generator -> data : incrementGenerationCount(userId)
+activate data
+
+data -> db : UPDATE users\nSET metadata = jsonb_set(metadata, \n  '{totalMealPlansGenerated}', \n  (metadata->'totalMealPlansGenerated')::int + 1)
+activate db
+db --> data : Success
+deactivate db
+
+data --> generator : Success
+deactivate data
+
+== Return Result ==
+generator -> generator : Calculate generationTime
+generator --> user : GenerationResult {\n  mealPlan,\n  tokensUsed,\n  provider,\n  generationTime\n}
+deactivate generator
+
+== Save Confirmed Plan (User Confirms) ==
+user -> data : saveMealPlan(userId, mealPlan)
+activate data
+
+data -> db : INSERT INTO meal_plans\n  (id, user_id, plan, status)\nVALUES (...)
+activate db
+db --> data : Success
+deactivate db
+
+data --> user : Saved meal plan with ID
+deactivate data
+
+@enduml

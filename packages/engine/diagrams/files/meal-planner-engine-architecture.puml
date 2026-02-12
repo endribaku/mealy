@@ -1,0 +1,149 @@
+@startuml Meal Planner Engine - System Architecture
+
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+
+title Meal Planner Engine - System Architecture
+
+package "User Interface Layer" {
+  [Mobile App\n(React Native)] as mobile
+  [Web App\n(Next.js)] as web
+  [API\n(Express.js)] as api
+}
+
+package "Core Engine\n📁 src/core/" {
+  component "MealPlanGenerator" as generator {
+    portin in1
+    portout out1
+  }
+  
+  component "ContextBuilder" as context {
+    portin in2
+    portout out2
+  }
+  
+  component "PromptBuilder" as prompt {
+    portin in3
+    portout out3
+  }
+  
+  component "RecipeGenerator" as recipe {
+    portin in4
+    portout out4
+  }
+}
+
+package "Data Layer\n📁 src/data/" {
+  interface "IDataAccess" as interface
+  component "SupabaseDataAccess" as dataaccess {
+    portin in5
+    portout out5
+  }
+}
+
+package "Schemas\n📁 src/core/schemas/" {
+  component "UserSchemas" as userschemas
+  component "SessionSchemas" as sessionschemas
+  component "MealPlanSchemas" as mealschemas
+}
+
+database "Supabase Database\n🗄️ PostgreSQL" {
+  [users\ntable] as users
+  [sessions\ntable] as sessions
+  [meal_plans\ntable] as mealplans
+}
+
+cloud "External Services" {
+  [OpenAI\nGPT-4] as openai
+  [Anthropic\nClaude] as anthropic
+}
+
+' Connections
+mobile --> api
+web --> api
+api --> generator
+
+generator --> context : 1. Build context
+generator --> prompt : 2. Build prompt
+generator --> openai : 3a. Generate (OpenAI)
+generator --> anthropic : 3b. Generate (Anthropic)
+
+context --> dataaccess : Get user + session
+dataaccess --> interface
+dataaccess --> users : Query users
+dataaccess --> sessions : Query sessions
+dataaccess --> mealplans : Save plans
+
+generator --> dataaccess : Save results
+recipe --> dataaccess : Get meal details
+
+' Schema connections
+dataaccess ..> userschemas : Validates
+dataaccess ..> sessionschemas : Validates
+dataaccess ..> mealschemas : Validates
+
+generator ..> mealschemas : Uses
+context ..> userschemas : Uses
+context ..> sessionschemas : Uses
+
+note right of generator
+  **Main Entry Point**
+  
+  Methods:
+  • generateMealPlan()
+  • regenerateSingleMeal()
+  • regenerateFullPlan()
+end note
+
+note right of context
+  **Data Extraction**
+  
+  Builds:
+  • User context
+  • Session context
+  • Full context for AI
+end note
+
+note right of dataaccess
+  **Database Operations**
+  
+  CRUD for:
+  • Users
+  • Sessions
+  • Meal plans
+  
+  Includes:
+  • Serialization
+  • Validation
+  • Error handling
+end note
+
+note bottom of users
+  **Columns:**
+  • id (UUID)
+  • email, name, diet
+  • profile (JSONB)
+  • learned_preferences (JSONB)
+  • metadata (JSONB)
+  • dietary_restrictions (JSONB)
+end note
+
+note bottom of sessions
+  **Columns:**
+  • id (UUID)
+  • user_id (FK)
+  • current_meal_plan (JSONB)
+  • modifications (JSONB)
+  • status, expires_at
+end note
+
+note bottom of mealplans
+  **Columns:**
+  • id (UUID)
+  • user_id (FK)
+  • plan (JSONB)
+  • status, confirmed_at
+end note
+
+@enduml

@@ -1,0 +1,278 @@
+@startuml Recipe Prompt Builder - All Scenarios
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 10
+
+title Recipe Prompt Builder - Three Generation Modes
+
+|User|
+start
+:Request recipe generation;
+
+|Recipe Prompt Builder|
+
+if (Generation mode?) then (BULK)
+  
+  |Bulk Recipe Generation|
+  partition "Input Data" #E8F4F8 {
+    :Receive MealPlan;
+    :Has ${days} days;
+    :Total meals = days × 3;
+  }
+  
+  partition "Build User Message" #D4EDDA {
+    :Start with header\n"Generate detailed recipes for ALL X meals";
+    
+    :Initialize meal list;
+    
+    fork
+      :Process Day 1;
+      :• Breakfast info\n  name, cuisine, ingredients, nutrition;
+      :• Lunch info\n  name, cuisine, ingredients, nutrition;
+      :• Dinner info\n  name, cuisine, ingredients, nutrition;
+    fork again
+      :Process Day 2;
+      :• 3 meals...;
+    fork again
+      :Process Day 3;
+      :• 3 meals...;
+    fork again
+      :...;
+      :Process all remaining days;
+    end fork
+    
+    :Add instructions section;
+    note right
+      "Generate detailed recipes for ALL meals"
+      
+      Each recipe should include:
+      ✓ Enhanced ingredients with prep notes
+      ✓ Step-by-step with timing
+      ✓ Equipment needed
+      ✓ Visual cues
+      ✓ Tips (if config.includeTips)
+      ✓ Make-ahead (if config.includeMakeAhead)
+      ✓ Variations (if config.includeVariations)
+    end note
+    
+    :Add output format\n"Respond with JSON: {recipes: [...], totalRecipes: X}";
+  }
+
+elseif (SINGLE) then
+  
+  |Single Recipe Generation|
+  partition "Input Data" #FFF3CD {
+    :Receive Meal object;
+    :Receive mealId\n(e.g., "breakfast-day1");
+  }
+  
+  partition "Build User Message" #D4EDDA {
+    :Start with header\n"Generate detailed recipe for this meal";
+    
+    :Add meal metadata;
+    note right
+      - Meal ID: breakfast-day1
+      - Name: Greek Yogurt Parfait
+      - Cuisine: american
+      - Prep Time: 5 minutes
+      - Spice Level: none
+      - Complexity: very-simple
+    end note
+    
+    :List all ingredients;
+    note right
+      Ingredients:
+      - 200g greek yogurt
+      - 50g granola
+      - 100g mixed berries
+      - 15ml honey
+    end note
+    
+    :Add nutrition data;
+    note right
+      Nutrition:
+      - Calories: 380
+      - Protein: 20g
+      - Carbs: 52g
+      - Fat: 10g
+    end note
+    
+    :Include basic instructions\nfrom meal plan;
+    note right
+      Current basic instructions:
+      1. Layer yogurt in a bowl
+      2. Top with granola and berries
+      3. Drizzle with honey
+    end note
+    
+    :Add expansion instructions;
+    note right
+      "Expand these basic instructions
+      into a detailed, professional recipe"
+      
+      Include:
+      • Prep notes for ingredients
+        (e.g., "granola, slightly crushed")
+      • Detailed steps with timing
+      • Techniques & temperatures
+      • Visual cues
+      • Equipment list
+      • Tips for success
+    end note
+    
+    :Add output format\n"Respond with single recipe JSON";
+  }
+
+else (REGENERATE)
+  
+  |Recipe Regeneration|
+  partition "Input Data" #F8D7DA {
+    :Receive DetailedRecipe;
+    :Receive user feedback\n(e.g., "make it faster");
+  }
+  
+  partition "Build User Message" #D4EDDA {
+    :Start with header\n"Regenerate recipe with feedback";
+    
+    :Add recipe name;
+    
+    :Add user feedback;
+    note right
+      User feedback: "Make this faster - 
+      I only have 15 minutes total 
+      in the morning"
+    end note
+    
+    :Include full current recipe JSON;
+    note right
+      Shows AI everything:
+      - All ingredients
+      - All steps
+      - Current timing
+      - Equipment
+      - Tips
+      - etc.
+    end note
+    
+    :Add regeneration guidance;
+    note right
+      "Address user's feedback while
+      maintaining core meal"
+      
+      Common patterns:
+      • "Make it faster"
+        → Simplify steps
+        → Use shortcuts
+        → Reduce cook time
+      
+      • "Too complicated"
+        → Break down steps
+        → Simpler techniques
+        → Less equipment
+      
+      • "Need more detail"
+        → Add visual cues
+        → More timing info
+        → Explain techniques
+      
+      • "Vegetarian version"
+        → Substitute ingredients
+        → Adjust cooking methods
+    end note
+    
+    :Add output format\n"Respond with updated recipe JSON";
+  }
+
+endif
+
+|Recipe Prompt Builder|
+:Combine with System Message;
+
+partition "System Message (Same for All)" #E6E6FA {
+  :Build system message;
+  
+  :Define AI role;
+  note right
+    "You are an expert culinary instructor
+    and recipe developer"
+    
+    Deep knowledge of:
+    • Professional cooking techniques
+    • Ingredient prep & handling
+    • Timing & temperature control
+    • Kitchen equipment & tools
+    • Recipe troubleshooting
+  end note
+  
+  :Set quality expectations;
+  note right
+    Recipes must be:
+    ✓ Clear & easy to follow
+    ✓ Precise with timing/temps/techniques
+    ✓ Include visual cues
+    ✓ Practical for home kitchen
+    ✓ Enhanced with tips & variations
+  end note
+  
+  :Define JSON schema;
+  note right
+    DetailedRecipe {
+      mealId, name, cuisine, servings
+      ingredients: [{name, amount, unit, prepNotes}]
+      steps: [{stepNumber, instruction, duration, 
+               technique, temperature, visualCue}]
+      timing: {prep, cook, total}
+      nutrition: {calories, protein, carbs, fat}
+      equipment: [...]
+      difficulty: enum
+      tips: [...] (optional)
+      makeAhead: string (optional)
+      storage: string (optional)
+      variations: [...] (optional)
+    }
+  end note
+  
+  :Add recipe guidelines;
+  note right
+    CLARITY: Teach as if student
+    TIMING: Realistic estimates
+    TECHNIQUES: Name & explain
+    EQUIPMENT: List all needed
+    TIPS: Pro tips & avoid mistakes
+  end note
+}
+
+:Return prompt object\n{systemMessage, userMessage};
+
+|AI Provider|
+:Receive complete prompt;
+
+if (Validation passed?) then (yes)
+  :Generate recipe(s);
+  :Return JSON;
+else (no)
+  :Return validation error;
+  stop
+endif
+
+|Recipe Generator|
+:Parse & validate response;
+
+if (Valid JSON?) then (yes)
+  if (Matches schema?) then (yes)
+    :Return DetailedRecipe(s);
+  else (no)
+    #Pink:Schema validation failed;
+    stop
+  endif
+else (no)
+  #Pink:JSON parse failed;
+  stop
+endif
+
+|User|
+:Receive detailed recipe(s);
+
+stop
+
+@enduml

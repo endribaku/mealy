@@ -1,0 +1,243 @@
+@startuml Meal Planner Engine - Data Flow
+
+!theme plain
+skinparam activityBackgroundColor #ECF0F1
+skinparam activityBorderColor #2C3E50
+skinparam activityDiamondBackgroundColor #3498DB
+skinparam activityDiamondBorderColor #2C3E50
+
+title Meal Planner Engine - Data Flow Diagram
+
+start
+
+:User Request Received;
+note right
+  Input:
+  • userId (UUID)
+  • sessionId (optional)
+  • options (optional)
+    - provider (OpenAI/Anthropic)
+    - temperature (0-1)
+    - numberOfDays (1-30)
+end note
+
+:Initialize MealPlanGenerator(dataAccess);
+
+partition "Context Building Phase" {
+  :Call buildFullContext(userId, sessionId);
+  
+  fork
+    :Query Database for User;
+    :Retrieve User Row|
+    note right
+      Database Query:
+      SELECT * FROM users
+      WHERE id = userId
+      
+      Returns JSONB columns:
+      • profile
+      • learned_preferences
+      • metadata
+      • dietary_restrictions
+    end note
+    
+    :Deserialize User|
+    note right
+      Convert JSONB → TypeScript
+      Validate with Zod schemas
+    end note
+    
+    :Build UserContext|
+    note right
+      Extract:
+      • hardConstraints
+        - allergies
+        - diet
+        - calorieTarget
+      • learnedPreferences
+        - favoriteCuisines
+        - spiceLevel
+      • metadata
+        - cookingSkill
+        - totalPlansGenerated
+      • preferences
+        - maxPrepTime
+        - budgetPerMeal
+      • goals
+    end note
+    
+  fork again
+    if (sessionId provided?) then (yes)
+      :Query Database for Session;
+      :Retrieve Session Row|
+      note right
+        Database Query:
+        SELECT * FROM sessions
+        WHERE id = sessionId
+        
+        Returns:
+        • current_meal_plan (JSONB)
+        • modifications (JSONB[])
+        • temporary_constraints
+      end note
+      
+      :Deserialize Session|
+      :Build SessionContext|
+      note right
+        Extract:
+        • currentMealPlan
+        • modifications
+        • temporaryConstraints
+      end note
+    else (no)
+      :Set SessionContext = null;
+    endif
+  end fork
+  
+  :Combine into FullContext;
+  :Estimate Token Count|
+  note right
+    Rough estimate:
+    JSON.stringify(context).length / 4
+  end note
+}
+
+partition "Prompt Building Phase" {
+  :Build System Message|
+  note right
+    Includes:
+    • AI role definition
+    • Output format (JSON schema)
+    • Nutrition guidelines
+    • Constraints
+  end note
+  
+  :Build User Message|
+  note right
+    Includes:
+    • User context (hardConstraints)
+    • Learned preferences
+    • Session history (if exists)
+    • Special instructions
+    • Number of days requested
+  end note
+  
+  :Combine Messages into Prompt;
+}
+
+partition "AI Generation Phase" {
+  if (Provider?) then (OpenAI)
+    :Call OpenAI GPT-4|
+    note right
+      Model: gpt-4
+      Temperature: 0.7 (default)
+      Max tokens: 8000
+      
+      With structured output:
+      Output.object({
+        schema: MealPlanSchema
+      })
+    end note
+  else (Anthropic)
+    :Call Anthropic Claude|
+    note right
+      Model: claude-sonnet-4
+      Temperature: 0.7 (default)
+      Max tokens: 8000
+    end note
+  endif
+  
+  :Receive AI Response|
+  note right
+    Response includes:
+    • output (meal plan JSON)
+    • usage (token counts)
+    • finishReason
+  end note
+  
+  :Validate with MealPlanSchema|
+  note right
+    Zod validation ensures:
+    • Correct structure
+    • All required fields
+    • Type safety
+    • Nutrition calculations
+  end note
+  
+  if (Valid?) then (yes)
+    :Extract Validated MealPlan;
+  else (no)
+    :Throw Validation Error;
+    stop
+  endif
+}
+
+partition "Persistence Phase" {
+  fork
+    :Save to Session|
+    note right
+      UPDATE sessions
+      SET current_meal_plan = mealPlan,
+          updated_at = NOW()
+      WHERE id = sessionId
+    end note
+    
+  fork again
+    :Update User Metadata|
+    note right
+      UPDATE users
+      SET metadata = jsonb_set(
+        metadata,
+        '{totalMealPlansGenerated}',
+        value + 1
+      )
+      WHERE id = userId
+    end note
+  end fork
+  
+  :Calculate Generation Time;
+  :Calculate Token Cost|
+  note right
+    Cost estimation:
+    • OpenAI: ~$0.03 per 1K tokens
+    • Anthropic: ~$0.015 per 1K tokens
+  end note
+}
+
+:Return GenerationResult|
+note right
+  Returns:
+  {
+    mealPlan: MealPlan,
+    tokensUsed: {
+      promptTokens,
+      completionTokens,
+      totalTokens
+    },
+    provider: 'openai' | 'anthropic',
+    generationTime: number (ms)
+  }
+end note
+
+if (User confirms plan?) then (yes)
+  :Save to meal_plans table|
+  note right
+    INSERT INTO meal_plans
+    (id, user_id, plan, status, confirmed_at)
+    VALUES (...)
+    
+    Permanent storage for history
+  end note
+  
+  :Return saved plan ID;
+else (no)
+  :Plan remains in session;
+  note right
+    Session expires after 7 days
+    Auto-cleanup via cron job
+  end note
+endif
+
+stop
+
+@enduml

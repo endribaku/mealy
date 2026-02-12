@@ -1,0 +1,123 @@
+@startuml Context Builder Flow
+
+skinparam backgroundColor #FFFFFF
+skinparam handwritten false
+skinparam defaultFontName Arial
+
+title Context Builder Process Flow
+
+start
+
+:User requests meal plan generation;
+note right
+  Input: userId
+  Optional: sessionId
+end note
+
+:Call buildFullContext(userId, sessionId?);
+
+partition "Build User Context" {
+  :Lookup user in mockUsers by userId;
+  
+  if (User exists?) then (yes)
+    :Extract Hard Constraints;
+    note right
+      - allergies[]
+      - diet
+      - calorieTarget
+    end note
+    
+    :Extract Learned Preferences;
+    note right
+      - dislikedIngredients[]
+      - favoriteCuisines[]
+      - spiceLevel
+      - preferredComplexity
+    end note
+    
+    :Extract Metadata;
+    note right
+      - cookingSkill
+      - householdSize
+      - totalPlansGenerated
+      - totalRatings
+    end note
+    
+    :Create UserContext object;
+  else (no)
+    :Throw Error: User not found;
+    stop
+  endif
+}
+
+partition "Build Session Context?" {
+  if (sessionId provided?) then (yes)
+    :Lookup session in mockSessions;
+    
+    if (Session exists?) then (yes)
+      :Extract modifications[];
+      note right
+        For each modification:
+        - mealId (if single meal)
+        - action (reject/regenerate/regenerate-all)
+        - reason
+        - timestamp
+      end note
+      
+      :Extract temporaryConstraints[];
+      note right
+        Session-specific constraints
+        Examples:
+        - "Lighter meals this week"
+        - "Low-carb this week only"
+        - "Quick prep meals"
+        
+        NOT permanent preferences
+        Deleted when session ends
+      end note
+      
+      :Create SessionContext object;
+      note right
+        {
+          modifications[],
+          temporaryConstraints[]
+        }
+      end note
+    else (no)
+      :Throw Error: Session not found;
+      stop
+    endif
+  else (no)
+    :Set SessionContext = null;
+    note right
+      First generation,
+      no session yet
+    end note
+  endif
+}
+
+partition "Combine & Estimate" {
+  :Combine UserContext + SessionContext;
+  
+  :Estimate token count;
+  note right
+    Convert to JSON string
+    Count characters / 4
+    (rough approximation)
+  end note
+  
+  :Create FullContext object;
+  note right
+    {
+      user: UserContext,
+      session: SessionContext | null,
+      estimatedTokens: number
+    }
+  end note
+}
+
+:Return FullContext;
+
+stop
+
+@enduml
