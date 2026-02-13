@@ -1,5 +1,5 @@
 import { config } from '@mealy/config'
-import { SupabaseDataAccess } from '../data/supabase-data-access.js'
+import { SupabaseDataAccess } from '@mealy/data'
 import { MealPlanGenerator, AIProvider } from '../core/meal-plan/meal-plan-generator.js'
 import { ContextBuilder } from '../core/context-builder.js'
 import { User } from '../core/schemas/user-schemas.js'
@@ -7,13 +7,15 @@ import { User } from '../core/schemas/user-schemas.js'
 async function testDatabaseConnection() {
   console.log('🧪 Testing Supabase Database & Meal Plan Engine...\n')
 
-  // Confirm config loaded
   console.log('Loaded config:')
   console.log('OpenAI model:', config.ai.openai.model)
   console.log('Supabase URL:', config.database.supabaseUrl)
   console.log('')
 
   const dataAccess = new SupabaseDataAccess()
+  const generator = new MealPlanGenerator()
+  const contextBuilder = new ContextBuilder()
+
   console.log('✅ Supabase client initialized')
 
   // ============================================================
@@ -57,14 +59,30 @@ async function testDatabaseConnection() {
   console.log(`✅ Session created: ${session.id}`)
 
   // ============================================================
+  // HELPER: Build FullContext
+  // ============================================================
+
+  async function buildContext() {
+    const user = await dataAccess.findUserById(createdUser.id)
+    if (!user) throw new Error('User not found')
+
+    const rawSession = await dataAccess.findSessionById(session.id)
+
+    const sessionContext = rawSession
+      ? contextBuilder.buildSessionContext(rawSession)
+      : null
+
+    return contextBuilder.buildFullContext(user, sessionContext)
+  }
+
+  // ============================================================
   // TEST 3: Generate Initial Plan
   // ============================================================
 
-  const generator = new MealPlanGenerator(dataAccess)
+  const initialContext = await buildContext()
 
   const initialResult = await generator.generateMealPlan(
-    createdUser.id,
-    session.id,
+    initialContext,
     {
       provider: AIProvider.OPENAI,
       temperature: 0.7,
@@ -82,20 +100,18 @@ async function testDatabaseConnection() {
   await dataAccess.updateSessionMealPlan(session.id, initialResult.mealPlan)
 
   // ============================================================
-  // TEST 4: Reject Single Meal
+  // TEST 4: Regenerate Single Meal
   // ============================================================
 
-
-
-  console.log('\n🔄 TEST 4: Regenerating single meal with integrity checks...')
+  console.log('\n🔄 TEST 4: Regenerating single meal...')
 
   const rejectedMealId = 'dinner-day1'
   const rejectionReason = 'Too spicy'
 
-  // Take snapshot BEFORE regeneration
-  const beforeRegenSnapshot = JSON.parse(
+  const beforeSnapshot = JSON.parse(
     JSON.stringify(initialResult.mealPlan)
   )
+
 
   await dataAccess.addSessionModification(session.id, {
     action: 'regenerate-meal',
@@ -103,65 +119,76 @@ async function testDatabaseConnection() {
     reason: rejectionReason
   })
 
+  const singleContext = await buildContext()
+
   const regeneratedMealResult = await generator.regenerateSingleMeal(
-    createdUser.id,
-    session.id,
+    singleContext,
     rejectedMealId,
     rejectionReason
   )
 
   console.log(`✅ Single meal regenerated`)
 
-  // Integrity validation
   const afterRegen = regeneratedMealResult.mealPlan
 
   let integrityPassed = true
 
-  for (let dayIndex = 0; dayIndex < beforeRegenSnapshot.days.length; dayIndex++) {
-    const beforeDay = beforeRegenSnapshot.days[dayIndex]
-    const afterDay = afterRegen.days[dayIndex]
+  // Ensure structure consistency first
+if (beforeSnapshot.days.length !== afterRegen.days.length) {
+  throw new Error(
+    `Day count mismatch: before=${beforeSnapshot.days.length}, after=${afterRegen.days.length}`
+  )
+}
 
-    if (!beforeDay || !afterDay) {
-      integrityPassed = false
-      console.error(`❌ Day mismatch at index ${dayIndex}`)
-      continue
-    }
+for (let dayIndex = 0; dayIndex < beforeSnapshot.days.length; dayIndex++) {
+  const beforeDay = beforeSnapshot.days[dayIndex]
+  const afterDay = afterRegen.days[dayIndex]
 
-    for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
-      const beforeMeal = beforeDay.meals[mealType]
-      const afterMeal = afterDay.meals[mealType]
+  if (!afterDay) {
+    console.error(`❌ Missing day ${dayIndex + 1}`)
+    integrityPassed = false
+    continue
+  }
 
-      const mealIdentifier = `${mealType}-day${dayIndex + 1}`
+  for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
+    const beforeMeal = beforeDay.meals[mealType]
+    const afterMeal = afterDay.meals[mealType]
+    const mealIdentifier = `${mealType}-day${dayIndex + 1}`
 
-      if (mealIdentifier === rejectedMealId) {
-        // This meal SHOULD be different
-        if (beforeMeal.name === afterMeal.name) {
-          console.error(`❌ Rejected meal did NOT change`)
-          integrityPassed = false
-        } else {
-          console.log(`   ✅ Rejected meal changed correctly`)
-        }
+    const mealsAreIdentical =
+      JSON.stringify(beforeMeal) === JSON.stringify(afterMeal)
+
+    if (mealIdentifier === rejectedMealId) {
+      // This meal SHOULD change (structurally)
+      if (mealsAreIdentical) {
+        console.error(`❌ Rejected meal did NOT change`)
+        integrityPassed = false
       } else {
-        // These meals MUST remain unchanged
-        if (beforeMeal.name !== afterMeal.name) {
-          console.error(`❌ ${mealType} on day ${dayIndex + 1} was modified unexpectedly`)
+        console.log(`   ✅ Rejected meal changed`)
+      }
+    } else {
+      // All other meals MUST remain identical
+        if (!mealsAreIdentical) {
+          console.error(
+            `❌ ${mealType} day ${dayIndex + 1} changed unexpectedly`
+          )
           integrityPassed = false
         }
       }
     }
   }
 
+
   if (!integrityPassed) {
     throw new Error('Single meal regeneration integrity check failed')
   }
 
-  console.log('✅ Integrity check passed — only targeted meal was modified')
+  console.log('✅ Integrity check passed')
 
   await dataAccess.updateSessionMealPlan(
     session.id,
     regeneratedMealResult.mealPlan
   )
-
 
   // ============================================================
   // TEST 5: Full Plan Regeneration
@@ -174,9 +201,10 @@ async function testDatabaseConnection() {
     reason: fullReason
   })
 
+  const fullContext = await buildContext()
+
   const fullRegenResult = await generator.regenerateFullPlan(
-    createdUser.id,
-    session.id,
+    fullContext,
     fullReason
   )
 
@@ -199,20 +227,6 @@ async function testDatabaseConnection() {
   console.log(`✅ Plan saved: ${savedPlan.id}`)
 
   // ============================================================
-  // TEST 7: Context Builder
-  // ============================================================
-
-  const contextBuilder = new ContextBuilder(dataAccess)
-
-  const fullContext = await contextBuilder.buildFullContext(
-    createdUser.id,
-    session.id
-  )
-
-  console.log(`✅ Context built`)
-  console.log(`   Estimated tokens: ${fullContext.estimatedTokens}`)
-
-  // ============================================================
   // CLEANUP
   // ============================================================
 
@@ -221,7 +235,7 @@ async function testDatabaseConnection() {
   await dataAccess.deleteUser(createdUser.id)
 
   console.log('\n' + '='.repeat(60))
-  console.log('🎉 ALL TESTS PASSED (Domain-Aligned)')
+  console.log('🎉 ALL TESTS PASSED (Clean Architecture)')
   console.log('='.repeat(60))
 }
 

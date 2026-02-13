@@ -34,7 +34,18 @@ Generate practical, balanced, personalized meal plans.`
   ): string {
 
     let message = this.buildContextSection(context)
-    message += '\n\n' + this.buildGenerationInstructions(context, config)
+
+    const isRegeneration =
+      specialInstructions?.includes('You are regenerating ONLY the meal')
+
+    if (!isRegeneration) {
+      // Normal full-plan generation
+      message += '\n\n' + this.buildGenerationInstructions(context, config)
+    } else {
+      // Regeneration mode – explicitly define regeneration task
+      message += '\n\n=== REGENERATION MODE ===\n'
+      message += 'You must modify ONLY the specified meal and keep all other meals identical.\n'
+    }
 
     if (specialInstructions) {
       message += '\n\n=== SPECIAL INSTRUCTIONS ===\n\n' + specialInstructions
@@ -42,6 +53,7 @@ Generate practical, balanced, personalized meal plans.`
 
     return message
   }
+
 
   buildPrompt(
     context: FullContext,

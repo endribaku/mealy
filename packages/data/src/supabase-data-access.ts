@@ -1,13 +1,16 @@
+import type { IDataAccess } from '@mealy/engine'
+import {
+  User,
+  UserSchema,
+  UserProfileUpdate,
+  LearnedPreferencesUpdate,
+  DietaryRestrictionsUpdate,
+  Session,
+  SessionSchema,
+  MealPlan,
+  StoredMealPlan
+} from '@mealy/engine'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { IDataAccess } from '../core/data-access.js'
-import { 
-  User, 
-  UserSchema, 
-  UserProfileUpdate, 
-  LearnedPreferencesUpdate, 
-  DietaryRestrictionsUpdate
-} from '../core/schemas/user-schemas.js'
-import { Session, SessionSchema, MealPlan } from '../core/schemas/schemas.js'
 import { config } from '@mealy/config'
 
 /**
@@ -382,12 +385,68 @@ export class SupabaseDataAccess implements IDataAccess {
     return data?.length || 0
   }
 
+  async applySessionRegeneration(
+    sessionId: string,
+    mealPlan: MealPlan,
+    modification: {
+      action: 'regenerate-meal' | 'regenerate-all'
+      mealId?: string
+      reason: string
+    }
+  ): Promise<Session> {
+
+    // 1️⃣ Fetch existing session
+    const session = await this.findSessionById(sessionId)
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`)
+    }
+
+    // 2️⃣ Build new modification entry
+    const newModification = {
+      timestamp: new Date().toISOString(),
+      action: modification.action,
+      mealId: modification.mealId,
+      reason: modification.reason,
+    }
+
+    const updatedModifications = [
+      ...session.modifications,
+      newModification
+    ]
+
+    // 3️⃣ Single update query
+    const { data, error } = await this.supabase
+      .from('sessions')
+      .update({
+        current_meal_plan: mealPlan,
+        modifications: updatedModifications,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(
+        `Failed to apply session regeneration: ${error.message}`
+      )
+    }
+
+    return this.deserializeSession(data)
+  }
+
+
   // ============================================================================
   // MEAL PLAN OPERATIONS
   // ============================================================================
 
-  async saveMealPlan(userId: string, mealPlan: MealPlan): Promise<MealPlan & { id: string }> {
+  async saveMealPlan(
+    userId: string,
+    mealPlan: MealPlan
+  ): Promise<StoredMealPlan> {
+
     const mealPlanId = crypto.randomUUID()
+    const now = new Date().toISOString()
 
     const { data, error } = await this.supabase
       .from('meal_plans')
@@ -395,9 +454,10 @@ export class SupabaseDataAccess implements IDataAccess {
         id: mealPlanId,
         user_id: userId,
         plan: mealPlan,
-        number_of_days: mealPlan.days.length, // ✅ FIX
+        number_of_days: mealPlan.days.length,
         status: 'active',
-        confirmed_at: new Date().toISOString(),
+        created_at: now,
+        confirmed_at: now
       })
       .select()
       .single()
@@ -408,12 +468,19 @@ export class SupabaseDataAccess implements IDataAccess {
 
     return {
       id: data.id,
-      ...data.plan,
+      userId: data.user_id,
+      mealPlan: data.plan,
+      createdAt: data.created_at,
+      status: data.status
     }
   }
 
 
-  async findMealPlanById(mealPlanId: string): Promise<(MealPlan & { id: string }) | null> {
+
+  async findMealPlanById(
+    mealPlanId: string
+  ): Promise<StoredMealPlan | null> {
+
     const { data, error } = await this.supabase
       .from('meal_plans')
       .select('*')
@@ -421,39 +488,49 @@ export class SupabaseDataAccess implements IDataAccess {
       .single()
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null
-      }
+      if (error.code === 'PGRST116') return null
       throw new Error(`Failed to find meal plan: ${error.message}`)
     }
 
-    if (!data) {
-      return null
-    }
+    if (!data) return null
 
     return {
       id: data.id,
-      ...data.plan,
+      userId: data.user_id,
+      mealPlan: data.plan,
+      createdAt: data.created_at,
+      status: data.status
     }
   }
 
-  async findMealPlansByUserId(userId: string, limit: number = 50): Promise<Array<MealPlan & { id: string }>> {
+
+  async findMealPlansByUserId(
+    userId: string,
+    limit: number = 50
+  ): Promise<StoredMealPlan[]> {
+
     const { data, error } = await this.supabase
       .from('meal_plans')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(limit) 
+      .limit(limit)
 
     if (error) {
-      throw new Error(`Failed to find meal plans for user: ${error.message}`)
+      throw new Error(
+        `Failed to find meal plans for user: ${error.message}`
+      )
     }
 
-    return data.map(row => ({
+    return (data || []).map(row => ({
       id: row.id,
-      ...row.plan,
+      userId: row.user_id,
+      mealPlan: row.plan,
+      createdAt: row.created_at,
+      status: row.status
     }))
   }
+
 
   async deleteMealPlan(mealPlanId: string): Promise<boolean> {
     const { error } = await this.supabase

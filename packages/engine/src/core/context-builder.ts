@@ -1,4 +1,3 @@
-import { IDataAccess } from './data-access.js'
 import { User } from '../core/schemas/user-schemas.js'
 
 /**
@@ -26,51 +25,19 @@ export interface FullContext {
 }
 
 /**
- * Errors
- */
-export class UserNotFoundError extends Error {
-  constructor(userId: string) {
-    super(`User not found: ${userId}`)
-    this.name = 'UserNotFoundError'
-  }
-}
-
-export class SessionNotFoundError extends Error {
-  constructor(sessionId: string) {
-    super(`Session not found: ${sessionId}`)
-    this.name = 'SessionNotFoundError'
-  }
-}
-
-/**
  * Context Builder
- * Domain-aligned: No schema reshaping.
+ * Pure domain logic — no database access.
  */
 export class ContextBuilder {
-  private dataAccess: IDataAccess
-
-  constructor(dataAccess: IDataAccess) {
-    this.dataAccess = dataAccess
-  }
 
   /**
    * Build Full Context
-   * Directly returns domain User
+   * Receives fully prepared domain objects.
    */
-  async buildFullContext(
-    userId: string,
-    sessionId?: string
-  ): Promise<FullContext> {
-
-    const user = await this.dataAccess.findUserById(userId)
-
-    if (!user) {
-      throw new UserNotFoundError(userId)
-    }
-
-    const session = sessionId
-      ? await this.buildSessionContext(sessionId)
-      : null
+  buildFullContext(
+    user: User,
+    session: SessionContext | null
+  ): FullContext {
 
     const estimatedTokens = this.estimateTokens(user, session)
 
@@ -82,34 +49,35 @@ export class ContextBuilder {
   }
 
   /**
-   * Build Session Context
+   * Transform raw session domain object into AI-relevant SessionContext.
+   * This keeps PromptBuilder isolated from full domain schema.
    */
-  private async buildSessionContext(
-    sessionId: string
-  ): Promise<SessionContext> {
-
-    const session =
-      await this.dataAccess.findSessionById(sessionId)
-
-    if (!session) {
-      throw new SessionNotFoundError(sessionId)
-    }
+  buildSessionContext(session: {
+    currentMealPlan?: any
+    modifications?: Array<{
+      mealId?: string
+      action: string
+      reason: string
+      timestamp: string
+    }>
+    temporaryConstraints?: string[]
+  }): SessionContext {
 
     return {
-      currentMealPlan: session.currentMealPlan || null,
-      modifications: session.modifications.map(mod => ({
+      currentMealPlan: session.currentMealPlan ?? null,
+      modifications: (session.modifications ?? []).map(mod => ({
         mealId: mod.mealId,
         action: mod.action,
         reason: mod.reason,
         timestamp: mod.timestamp,
       })),
-      temporaryConstraints:
-        session.temporaryConstraints || [],
+      temporaryConstraints: session.temporaryConstraints ?? [],
     }
   }
 
   /**
-   * Token Estimation (approximate)
+   * Token Estimation (very approximate)
+   * Rough heuristic: ~4 characters per token.
    */
   private estimateTokens(
     user: User,
@@ -124,7 +92,7 @@ export class ContextBuilder {
   }
 
   /**
-   * Debug helper
+   * Debug helper (optional)
    */
   toPromptString(context: FullContext): string {
     return JSON.stringify(context, null, 2)

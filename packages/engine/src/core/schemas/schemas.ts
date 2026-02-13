@@ -75,6 +75,14 @@ export const SessionSchema = z.object({
   status: z.enum(['active', 'confirmed', 'expired', 'cancelled']).default('active'),
 })
 
+export interface StoredMealPlan {
+  id: string
+  userId: string
+  mealPlan: MealPlan
+  createdAt: string
+  status: 'active' | 'archived' | 'deleted'
+}
+
 
 
 // ============================================================================

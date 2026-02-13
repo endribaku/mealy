@@ -2,10 +2,10 @@ import {
   User,
   UserProfileUpdate,
   LearnedPreferencesUpdate,
-  DietaryRestrictionsUpdate
+  DietaryRestrictionsUpdate,
 } from '../core/schemas/user-schemas.js'
 
-import { Session, MealPlan } from '../core/schemas/schemas.js'
+import { Session, MealPlan, StoredMealPlan } from '../core/schemas/schemas.js'
 
 /**
  * IDataAccess
@@ -89,17 +89,30 @@ export interface IDataAccess {
   saveMealPlan(
     userId: string,
     mealPlan: MealPlan
-  ): Promise<MealPlan & { id: string }>
+  ): Promise<StoredMealPlan & { id: string }>
 
   findMealPlanById(
     mealPlanId: string
-  ): Promise<(MealPlan & { id: string }) | null>
+  ): Promise<StoredMealPlan | null>
+
 
   findMealPlansByUserId(
     userId: string,
     limit?: number
-  ): Promise<Array<MealPlan & { id: string }>>
+  ): Promise<StoredMealPlan[]>
+
 
   deleteMealPlan(mealPlanId: string): Promise<boolean>
+
+  applySessionRegeneration(
+    sessionId: string,
+    mealPlan: MealPlan,
+    modification: {
+      action: 'regenerate-meal' | 'regenerate-all'
+      mealId?: string
+      reason: string
+    }
+  ): Promise<Session>
+
 }
 

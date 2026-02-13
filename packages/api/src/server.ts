@@ -1,3 +1,7 @@
-import { config } from "@mealy/config"
+import { createApp } from './app'
 
-console.log(config.api.port)
+const app = createApp()
+
+app.listen(3000, () => {
+	console.log('Server running on http://localhost:3000')
+})

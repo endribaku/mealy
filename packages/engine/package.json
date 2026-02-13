@@ -2,7 +2,7 @@
   "name": "@mealy/engine",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.ts",
   "scripts": {
     "test": "jest"
   },
@@ -14,6 +14,7 @@
     "@ai-sdk/anthropic": "^3.0.42",
     "@ai-sdk/openai": "^3.0.27",
     "@mealy/config": "workspace:*",
+    "@mealy/data": "workspace:*",
     "@supabase/supabase-js": "^2.95.3",
     "ai": "^6.0.81",
     "zod": "^4.3.6"
