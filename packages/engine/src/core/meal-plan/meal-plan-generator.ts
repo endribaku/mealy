@@ -1,4 +1,4 @@
-import { generateText, LanguageModelUsage, Output } from 'ai'
+import { generateText, Output } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { openai } from '@ai-sdk/openai'
 import { config } from '@mealy/config'
@@ -18,6 +18,11 @@ export enum AIProvider {
   OPENAI = 'openai'
 }
 
+export interface EngineUsage {
+	totalTokens: number
+}
+
+
 export interface GenerationOptions {
   provider?: AIProvider
   temperature?: number
@@ -28,7 +33,7 @@ export interface GenerationOptions {
 
 export interface GenerationResult {
   mealPlan: MealPlan
-  tokensUsed: LanguageModelUsage
+  tokensUsed: EngineUsage
   provider: AIProvider
   generationTime: number
 }
@@ -64,17 +69,13 @@ export class MealPlanGenerator {
       const result = await this.callAI(prompt, options)
       const mealPlan = this.validateAndParse(result)
 
-      const usage = result.usage ?? { totalTokens: 0 }
-
       return {
         mealPlan,
-        tokensUsed: {
-          ...usage,
-          totalTokens: usage.totalTokens ?? 0
-        },
+        tokensUsed: this.normalizeUsage(result.usage),
         provider: options.provider ?? AIProvider.OPENAI,
         generationTime: Date.now() - startTime
       }
+
     }
 
     /**
@@ -153,7 +154,7 @@ export class MealPlanGenerator {
           if (retryMeal && !this.mealsAreIdentical(beforeMeal, retryMeal)) {
             return {
               mealPlan: retryPlan,
-              tokensUsed: retryResult.usage ?? { totalTokens: 0 },
+              tokensUsed: this.normalizeUsage(retryResult.usage),
               provider: options.provider ?? AIProvider.OPENAI,
               generationTime: Date.now() - startTime
             }
@@ -166,7 +167,7 @@ export class MealPlanGenerator {
 
       return {
         mealPlan,
-        tokensUsed: result.usage ?? { totalTokens: 0 },
+        tokensUsed: this.normalizeUsage(result.usage),
         provider: options.provider ?? AIProvider.OPENAI,
         generationTime: Date.now() - startTime
       }
@@ -204,7 +205,7 @@ export class MealPlanGenerator {
 
       return {
         mealPlan,
-        tokensUsed: result.usage ?? { totalTokens: 0 },
+        tokensUsed: this.normalizeUsage(result.usage),
         provider: options.provider ?? AIProvider.OPENAI,
         generationTime: Date.now() - startTime
       }
@@ -274,7 +275,16 @@ export class MealPlanGenerator {
       }
       return null
     }
+    
+
+    private normalizeUsage(usage: any): EngineUsage {
+      return {
+        totalTokens: usage?.totalTokens ?? 0
+      }
+    }
+
 
 }
+
 
 

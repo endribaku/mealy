@@ -4,7 +4,6 @@ import {
   MealPlanGenerator,
   GenerationOptions
 } from '@mealy/engine'
-import { MealPlan } from '@mealy/engine'
 
 export class MealPlanService {
 
@@ -29,31 +28,30 @@ export class MealPlanService {
 
         const user = await this.ensureUserExists(userId)
 
-        // 🧠 Generate first (no DB writes yet)
+        // 🧠 Generate first
         const tempContext = this.contextBuilder.buildFullContext(user, null)
 
         const result = await this.generator.generateMealPlan(
-        tempContext,
-        options
+            tempContext,
+            options
         )
 
-        // 💾 Persist after success
-        const session = await this.dataAccess.createSession(userId)
-
-        await this.dataAccess.updateSessionMealPlan(
-        session.id,
-        result.mealPlan
+        // 💾 Persist in one atomic step
+        const session = await this.dataAccess.createSession(
+            userId,
+            result.mealPlan
         )
 
         return {
-        sessionId: session.id,
-        mealPlan: result.mealPlan,
-        metadata: {
-            tokensUsed: result.tokensUsed.totalTokens,
-            generationTime: result.generationTime
-        }
+            sessionId: session.id,
+            mealPlan: result.mealPlan,
+            metadata: {
+                tokensUsed: result.tokensUsed.totalTokens,
+                generationTime: result.generationTime
+            }
         }
     }
+
 
     // ============================================================
     // REGENERATE SINGLE MEAL

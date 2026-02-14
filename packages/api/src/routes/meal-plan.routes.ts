@@ -1,30 +1,45 @@
 import { Router } from 'express'
+import { validateRequest } from 'zod-express-middleware'
 import { MealPlanController } from '../controllers/meal-plan.controller'
+import {
+	GenerateMealPlanParamsSchema,
+	GenerateMealPlanBodySchema,
+	RegenerateSingleParamsSchema,
+	RegenerateSingleBodySchema,
+	ConfirmMealPlanParamsSchema,
+	ConfirmMealPlanBodySchema
+} from '../middleware/validation/meal-plan.schemas'
 
 export function createMealPlanRoutes(
 	controller: MealPlanController
-): Router {
-
+) {
 	const router = Router()
 
 	router.post(
-		'/users/:userId/sessions',
+		'/users/:userId',
+		validateRequest({
+			params: GenerateMealPlanParamsSchema,
+			body: GenerateMealPlanBodySchema
+		}),
 		controller.generate.bind(controller)
 	)
 
-	router.get(
-		'/users/:userId/meal-plans',
-		controller.getHistory.bind(controller)
+	router.post(
+		'/sessions/:sessionId/regenerate',
+		validateRequest({
+			params: RegenerateSingleParamsSchema,
+			body: RegenerateSingleBodySchema
+		}),
+		controller.regenerateSingle.bind(controller)
 	)
 
-	router.get(
-		'/users/:userId/meal-plans/:planId',
-		controller.getById.bind(controller)
-	)
-
-	router.delete(
-		'/users/:userId/meal-plans/:planId',
-		controller.delete.bind(controller)
+	router.post(
+		'/sessions/:sessionId/confirm',
+		validateRequest({
+			params: ConfirmMealPlanParamsSchema,
+			body: ConfirmMealPlanBodySchema
+		}),
+		controller.confirm.bind(controller)
 	)
 
 	return router

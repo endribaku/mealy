@@ -243,10 +243,16 @@ export class SupabaseDataAccess implements IDataAccess {
     return data.map(row => this.deserializeSession(row))
   }
 
-  async createSession(userId: string): Promise<Session> {
+  async createSession(
+    userId: string,
+    initialMealPlan?: MealPlan
+  ): Promise<Session> {
+
     const sessionId = crypto.randomUUID()
     const now = new Date().toISOString()
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+    const expiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString()
 
     const { data, error } = await this.supabase
       .from('sessions')
@@ -259,6 +265,7 @@ export class SupabaseDataAccess implements IDataAccess {
         status: 'active',
         modifications: [],
         temporary_constraints: [],
+        current_meal_plan: initialMealPlan ?? null
       })
       .select()
       .single()
@@ -269,6 +276,7 @@ export class SupabaseDataAccess implements IDataAccess {
 
     return this.deserializeSession(data)
   }
+
 
   async updateSessionMealPlan(sessionId: string, mealPlan: MealPlan): Promise<Session> {
     const { data, error } = await this.supabase

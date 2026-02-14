@@ -56,7 +56,11 @@ export interface IDataAccess {
     limit?: number
   ): Promise<Session[]>
 
-  createSession(userId: string): Promise<Session>
+  createSession(
+    userId: string,
+    initialMealPlan?: MealPlan
+  ): Promise<Session>
+
 
   updateSessionMealPlan(
     sessionId: string,

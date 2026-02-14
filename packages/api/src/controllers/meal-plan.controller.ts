@@ -1,119 +1,183 @@
 import { Request, Response, NextFunction } from 'express'
 import { MealPlanService } from '../services/meal-plan.service'
+import { GenerationOptions, MealPlan } from '@mealy/engine'
+
 import {
-	GenerateMealPlanRequest,
 	GenerateMealPlanResponse,
-	BasicSuccessResponse,
-	ErrorResponse
+	BasicSuccessResponse
 } from '../types/dto.types'
+
+import { StoredMealPlan } from '@mealy/engine'
 
 export class MealPlanController {
 
-	constructor(private service: MealPlanService) {}
+	constructor(
+		private readonly service: MealPlanService
+	) {}
+
+	// ============================================================
+	// GENERATE NEW PLAN
+	// POST /api/users/:userId/meal-plans
+	// ============================================================
 
 	async generate(
-	req: Request,
-	res: Response,
-	next: NextFunction
-    ) {
-        try {
-            const { userId } = req.params
-            const body = req.body as GenerateMealPlanRequest
-
-            if (!userId) {
-                const error: ErrorResponse = {
-                    success: false,
-                    message: 'userId is required'
-                }
-                return res.status(400).json(error)
-            }
-
-            const serviceResult = await this.service.generateMealPlan(
-                userId as string,
-                body.options
-            )
-
-            const responseData: GenerateMealPlanResponse = {
-                sessionId: serviceResult.sessionId,
-                mealPlan: serviceResult.mealPlan,
-                metadata: {
-                    tokensUsed: serviceResult.metadata.tokensUsed ?? 0,
-                    generationTime: serviceResult.metadata.generationTime
-                }
-            }
-
-            const response: BasicSuccessResponse<GenerateMealPlanResponse> = {
-                success: true,
-                data: responseData
-            }
-
-            return res.status(201).json(response)
-
-        } catch (error) {
-            next(error)
-        }
-    }
-
-
-	async getHistory(
-		req: Request,
+		req: Request<
+			{ userId: string },
+			BasicSuccessResponse<GenerateMealPlanResponse>,
+			{ options?: GenerationOptions }
+		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
+
 			const { userId } = req.params
+			const { options } = req.body
 
-			const plans = await this.service.getMealPlanHistory(userId as string)
+			const result =
+				await this.service.generateMealPlan(
+					userId,
+					options
+				)
 
-			return res.json({
+			const response: BasicSuccessResponse<GenerateMealPlanResponse> = {
 				success: true,
-				data: plans
-			})
+				data: {
+					sessionId: result.sessionId,
+					mealPlan: result.mealPlan,
+					metadata: {
+						tokensUsed: result.metadata.tokensUsed,
+						generationTime: result.metadata.generationTime
+					}
+				}
+			}
+
+			return res.status(201).json(response)
 
 		} catch (error) {
 			next(error)
 		}
 	}
 
-	async getById(
-		req: Request,
+	// ============================================================
+	// REGENERATE SINGLE MEAL
+	// POST /api/sessions/:sessionId/regenerate-meal
+	// ============================================================
+
+	async regenerateSingle(
+		req: Request<
+			{ sessionId: string },
+			BasicSuccessResponse<{ mealPlan: MealPlan }>,
+			{
+				userId: string
+				mealId: string
+				reason: string
+				options?: GenerationOptions
+			}
+		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId, planId } = req.params
 
-			const plan = await this.service.getMealPlanById(
-				userId as string,
-				planId as string
-			)
+			const { sessionId } = req.params
+			const { userId, mealId, reason, options } = req.body
 
-			return res.json({
+			const mealPlan =
+				await this.service.regenerateSingleMeal(
+					userId,
+					sessionId,
+					mealId,
+					reason,
+					options
+				)
+
+			const response: BasicSuccessResponse<{ mealPlan: MealPlan }> = {
 				success: true,
-				data: plan
-			})
+				data: { mealPlan }
+			}
+
+			return res.json(response)
 
 		} catch (error) {
 			next(error)
 		}
 	}
 
-	async delete(
-		req: Request,
+	// ============================================================
+	// REGENERATE FULL PLAN
+	// POST /api/sessions/:sessionId/regenerate
+	// ============================================================
+
+	async regenerateFull(
+		req: Request<
+			{ sessionId: string },
+			BasicSuccessResponse<{ mealPlan: MealPlan }>,
+			{
+				userId: string
+				reason: string
+				options?: GenerationOptions
+			}
+		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId, planId } = req.params
 
-			await this.service.deleteMealPlan(
-				userId as string,
-				planId as string
-			)
+			const { sessionId } = req.params
+			const { userId, reason, options } = req.body
 
-			return res.json({
-				success: true
-			})
+			const mealPlan =
+				await this.service.regenerateFullPlan(
+					userId,
+					sessionId,
+					reason,
+					options
+				)
+
+			const response: BasicSuccessResponse<{ mealPlan: MealPlan }> = {
+				success: true,
+				data: { mealPlan }
+			}
+
+			return res.json(response)
+
+		} catch (error) {
+			next(error)
+		}
+	}
+
+	// ============================================================
+	// CONFIRM PLAN
+	// POST /api/sessions/:sessionId/confirm
+	// ============================================================
+
+	async confirm(
+        req: Request<
+            { sessionId: string },
+            BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>,
+            { userId: string }
+        >,
+        res: Response,
+        next: NextFunction
+    ) {
+		try {
+
+			const { sessionId } = req.params
+			const { userId } = req.body
+
+			const savedPlan =
+				await this.service.confirmMealPlan(
+					userId,
+					sessionId
+				)
+
+            const response: BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }> = {
+                success: true,
+                data: { mealPlan: savedPlan }
+            }
+
+			return res.json(response)
 
 		} catch (error) {
 			next(error)
