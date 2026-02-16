@@ -1,22 +1,40 @@
 import { Request, Response, NextFunction } from 'express'
-import { MealPlanService } from '../services/meal-plan.service'
+import { SessionService } from '../services/session.service'
+import { BasicSuccessResponse } from '../types/dto.types'
 
 export class SessionController {
 
-	constructor(private service: MealPlanService) {}
+	constructor(
+		private readonly service: SessionService
+	) {}
+
+	// ============================================================
+	// GET SESSION BY ID
+	// GET /api/users/:userId/sessions/:sessionId
+	// ============================================================
 
 	async getById(
-		req: Request,
+		req: Request<
+			{ userId: string; sessionId: string },
+			BasicSuccessResponse<
+				Awaited<ReturnType<SessionService['getById']>>
+			>
+		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { sessionId } = req.params
 
-			// You may later add a service method for this
+			const { userId, sessionId } = req.params
+
+			const session = await this.service.getById(
+				userId,
+				sessionId
+			)
+
 			return res.json({
 				success: true,
-				data: sessionId
+				data: session
 			})
 
 		} catch (error) {
@@ -24,95 +42,31 @@ export class SessionController {
 		}
 	}
 
-	async regenerateSingle(
-		req: Request,
-		res: Response,
-		next: NextFunction
-	) {
-		try {
-			const { sessionId } = req.params
-			const { userId, mealId, reason } = req.body
-
-			const result =
-				await this.service.regenerateSingleMeal(
-					userId,
-					sessionId as string,
-					mealId,
-					reason
-				)
-
-			return res.json({
-				success: true,
-				data: result
-			})
-
-		} catch (error) {
-			next(error)
-		}
-	}
-
-	async regenerateFull(
-		req: Request,
-		res: Response,
-		next: NextFunction
-	) {
-		try {
-			const { sessionId } = req.params
-			const { userId, reason } = req.body
-
-			const result =
-				await this.service.regenerateFullPlan(
-					userId,
-					sessionId as string,
-					reason
-				)
-
-			return res.json({
-				success: true,
-				data: result
-			})
-
-		} catch (error) {
-			next(error)
-		}
-	}
-
-	async confirm(
-		req: Request,
-		res: Response,
-		next: NextFunction
-	) {
-		try {
-			const { sessionId } = req.params
-			const { userId } = req.body
-
-			const result =
-				await this.service.confirmMealPlan(
-					userId,
-					sessionId as string
-				)
-
-			return res.json({
-				success: true,
-				data: result
-			})
-
-		} catch (error) {
-			next(error)
-		}
-	}
+	// ============================================================
+	// DELETE SESSION
+	// DELETE /api/users/:userId/sessions/:sessionId
+	// ============================================================
 
 	async delete(
-		req: Request,
+		req: Request<
+			{ userId: string; sessionId: string },
+			BasicSuccessResponse<{ deleted: true }>
+		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { sessionId } = req.params
 
-			// Optional future implementation
+			const { userId, sessionId } = req.params
+
+			await this.service.delete(
+				userId,
+				sessionId
+			)
+
 			return res.json({
-				success: true
+				success: true,
+				data: { deleted: true }
 			})
 
 		} catch (error) {

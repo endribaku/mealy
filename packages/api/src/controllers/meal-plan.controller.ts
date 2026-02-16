@@ -1,13 +1,11 @@
 import { Request, Response, NextFunction } from 'express'
 import { MealPlanService } from '../services/meal-plan.service'
-import { GenerationOptions, MealPlan } from '@mealy/engine'
+import { GenerationOptions, MealPlan, StoredMealPlan } from '@mealy/engine'
 
 import {
 	GenerateMealPlanResponse,
 	BasicSuccessResponse
 } from '../types/dto.types'
-
-import { StoredMealPlan } from '@mealy/engine'
 
 export class MealPlanController {
 
@@ -34,25 +32,15 @@ export class MealPlanController {
 			const { userId } = req.params
 			const { options } = req.body
 
-			const result =
-				await this.service.generateMealPlan(
-					userId,
-					options
-				)
+			const result = await this.service.generateMealPlan(
+				userId,
+				options
+			)
 
-			const response: BasicSuccessResponse<GenerateMealPlanResponse> = {
+			return res.status(201).json({
 				success: true,
-				data: {
-					sessionId: result.sessionId,
-					mealPlan: result.mealPlan,
-					metadata: {
-						tokensUsed: result.metadata.tokensUsed,
-						generationTime: result.metadata.generationTime
-					}
-				}
-			}
-
-			return res.status(201).json(response)
+				data: result
+			})
 
 		} catch (error) {
 			next(error)
@@ -83,21 +71,18 @@ export class MealPlanController {
 			const { sessionId } = req.params
 			const { userId, mealId, reason, options } = req.body
 
-			const mealPlan =
-				await this.service.regenerateSingleMeal(
-					userId,
-					sessionId,
-					mealId,
-					reason,
-					options
-				)
+			const mealPlan = await this.service.regenerateSingleMeal(
+				userId,
+				sessionId,
+				mealId,
+				reason,
+				options
+			)
 
-			const response: BasicSuccessResponse<{ mealPlan: MealPlan }> = {
+			return res.json({
 				success: true,
 				data: { mealPlan }
-			}
-
-			return res.json(response)
+			})
 
 		} catch (error) {
 			next(error)
@@ -127,20 +112,17 @@ export class MealPlanController {
 			const { sessionId } = req.params
 			const { userId, reason, options } = req.body
 
-			const mealPlan =
-				await this.service.regenerateFullPlan(
-					userId,
-					sessionId,
-					reason,
-					options
-				)
+			const mealPlan = await this.service.regenerateFullPlan(
+				userId,
+				sessionId,
+				reason,
+				options
+			)
 
-			const response: BasicSuccessResponse<{ mealPlan: MealPlan }> = {
+			return res.json({
 				success: true,
 				data: { mealPlan }
-			}
-
-			return res.json(response)
+			})
 
 		} catch (error) {
 			next(error)
@@ -153,31 +135,121 @@ export class MealPlanController {
 	// ============================================================
 
 	async confirm(
-        req: Request<
-            { sessionId: string },
-            BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>,
-            { userId: string }
-        >,
-        res: Response,
-        next: NextFunction
-    ) {
+		req: Request<
+			{ sessionId: string },
+			BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>,
+			{ userId: string }
+		>,
+		res: Response,
+		next: NextFunction
+	) {
 		try {
 
 			const { sessionId } = req.params
 			const { userId } = req.body
 
-			const savedPlan =
-				await this.service.confirmMealPlan(
-					userId,
-					sessionId
-				)
+			const savedPlan = await this.service.confirmMealPlan(
+				userId,
+				sessionId
+			)
 
-            const response: BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }> = {
-                success: true,
-                data: { mealPlan: savedPlan }
-            }
+			return res.json({
+				success: true,
+				data: { mealPlan: savedPlan }
+			})
 
-			return res.json(response)
+		} catch (error) {
+			next(error)
+		}
+	}
+
+    // ============================================================
+	// GET MEAL PLAN HISTORY
+	// GET /api/users/:userId/meal-plans
+	// ============================================================
+
+	async getAll(
+		req: Request<
+			{ userId: string },
+			BasicSuccessResponse<StoredMealPlan[]>
+		>,
+		res: Response,
+		next: NextFunction
+	) {
+		try {
+
+			const { userId } = req.params
+
+			const plans = await this.service.getMealPlanHistory(userId)
+
+			return res.json({
+				success: true,
+				data: plans
+			})
+
+		} catch (error) {
+			next(error)
+		}
+	}
+
+	// ============================================================
+	// GET SINGLE MEAL PLAN
+	// GET /api/users/:userId/meal-plans/:planId
+	// ============================================================
+
+	async getById(
+		req: Request<
+			{ userId: string; planId: string },
+			BasicSuccessResponse<StoredMealPlan>
+		>,
+		res: Response,
+		next: NextFunction
+	) {
+		try {
+
+			const { userId, planId } = req.params
+
+			const plan = await this.service.getMealPlanById(
+				userId,
+				planId
+			)
+
+			return res.json({
+				success: true,
+				data: plan
+			})
+
+		} catch (error) {
+			next(error)
+		}
+	}
+
+	// ============================================================
+	// DELETE MEAL PLAN
+	// DELETE /api/users/:userId/meal-plans/:planId
+	// ============================================================
+
+	async delete(
+		req: Request<
+			{ userId: string; planId: string },
+			BasicSuccessResponse<{ deleted: true }>
+		>,
+		res: Response,
+		next: NextFunction
+	) {
+		try {
+
+			const { userId, planId } = req.params
+
+			await this.service.deleteMealPlan(
+				userId,
+				planId
+			)
+
+			return res.json({
+				success: true,
+				data: { deleted: true }
+			})
 
 		} catch (error) {
 			next(error)

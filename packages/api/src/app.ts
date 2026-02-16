@@ -12,7 +12,11 @@ import { UserController } from './controllers/user.controller'
 import { createUserRoutes } from './routes/user.routes'
 import { createSessionRoutes } from './routes/session.routes'
 import { createMealPlanRoutes } from './routes/meal-plan.routes'
-import { globalErrorHandler } from './middleware/error/global-error.middleware'
+import { globalErrorHandler, notFoundHandler } from './middleware/error/global-error.middleware'
+import { createRateLimiter } from './middleware/rate-limiter/rate-limiter.middleware'
+import { UserService } from './services/user.service'
+import { SessionService } from './services/session.service'
+
 
 export function createApp() {
 
@@ -28,37 +32,56 @@ export function createApp() {
 	}))
 
 	// Parse JSON first
+    app.set('trust proxy', 1)
+
 	app.use(express.json())
 
 	// HTTP request logging
 	app.use(morgan('dev'))
+
+    // rate limiter logic
+    
+
+	// Global limiter
+	app.use(
+		createRateLimiter({
+			windowMs: 15 * 60 * 1000,
+			max: 100
+		})
+	)
+
+    // ai-specific limiter
+    const aiLimiter = createRateLimiter({
+        windowMs: 60 * 1000,
+        max: 10,
+        message: 'AI generation limit exceeded'
+    })
+
 
 	// Infrastructure
 	const dataAccess = new SupabaseDataAccess()
 
 	// Services
 	const mealPlanService = new MealPlanService(dataAccess)
+    const userService = new UserService(dataAccess)
+    const sessionService = new SessionService(dataAccess)
 
 	// Controllers
 	const mealPlanController = new MealPlanController(mealPlanService)
-	const sessionController = new SessionController(mealPlanService)
-	const userController = new UserController(dataAccess)
+	const sessionController = new SessionController(sessionService)
+	const userController = new UserController(userService)
 
 	// Routes
-	app.use('/api/users',
-		createUserRoutes(userController)
-	)
+	app.use('/api/users', createUserRoutes(userController))
+    app.use('/api/users', createSessionRoutes(sessionController))
+    app.use('/api/users', createMealPlanRoutes(mealPlanController, aiLimiter))
 
-	app.use('/api/meal-plans',
-		createMealPlanRoutes(mealPlanController)
-	)
 
-	app.use('/api/sessions',
-		createSessionRoutes(sessionController)
-	)
+	// 404 handler
+    app.use(notFoundHandler)
 
-	// ✅ Global error handler MUST be last
-	app.use(globalErrorHandler)
+    // Error handler
+    app.use(globalErrorHandler)
 
 	return app
 }

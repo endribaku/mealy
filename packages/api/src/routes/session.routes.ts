@@ -1,25 +1,34 @@
 import { Router } from 'express'
+import { validateRequest } from 'zod-express-middleware'
 import { SessionController } from '../controllers/session.controller'
+
+import {
+	SessionParamsSchema
+} from '../middleware/validation/common-param.schemas'
 
 export function createSessionRoutes(
 	controller: SessionController
-): Router {
-
+) {
 	const router = Router()
 
-	router.get('/:sessionId', controller.getById.bind(controller))
-	router.delete('/:sessionId', controller.delete.bind(controller))
+	// ============================================================
+	// GET SESSION
+	// ============================================================
 
-	router.post('/:sessionId/regenerate',
-		controller.regenerateSingle.bind(controller)
+	router.get(
+		'/:userId/sessions/:sessionId',
+		validateRequest({ params: SessionParamsSchema }),
+		controller.getById.bind(controller)
 	)
 
-	router.post('/:sessionId/regenerate-all',
-		controller.regenerateFull.bind(controller)
-	)
+	// ============================================================
+	// DELETE SESSION
+	// ============================================================
 
-	router.post('/:sessionId/confirm',
-		controller.confirm.bind(controller)
+	router.delete(
+		'/:userId/sessions/:sessionId',
+		validateRequest({ params: SessionParamsSchema }),
+		controller.delete.bind(controller)
 	)
 
 	return router

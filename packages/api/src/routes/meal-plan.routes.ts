@@ -1,45 +1,107 @@
 import { Router } from 'express'
 import { validateRequest } from 'zod-express-middleware'
 import { MealPlanController } from '../controllers/meal-plan.controller'
+import { RateLimitRequestHandler } from 'express-rate-limit'
 import {
-	GenerateMealPlanParamsSchema,
+	UserIdParamsSchema,
+	SessionParamsSchema,
+	PlanParamsSchema
+} from '../middleware/validation/common-param.schemas.ts'
+
+import {
 	GenerateMealPlanBodySchema,
-	RegenerateSingleParamsSchema,
 	RegenerateSingleBodySchema,
-	ConfirmMealPlanParamsSchema,
-	ConfirmMealPlanBodySchema
+	RegenerateFullBodySchema
 } from '../middleware/validation/meal-plan.schemas'
 
 export function createMealPlanRoutes(
-	controller: MealPlanController
+	controller: MealPlanController,
+    aiLimiter: RateLimitRequestHandler
 ) {
 	const router = Router()
 
+	// ============================================================
+	// GENERATE NEW PLAN
+	// ============================================================
+
 	router.post(
-		'/users/:userId',
+		'/:userId/meal-plans',
+        aiLimiter,
 		validateRequest({
-			params: GenerateMealPlanParamsSchema,
+			params: UserIdParamsSchema,
 			body: GenerateMealPlanBodySchema
 		}),
 		controller.generate.bind(controller)
 	)
 
+	// ============================================================
+	// REGENERATE SINGLE MEAL
+	// ============================================================
+
 	router.post(
-		'/sessions/:sessionId/regenerate',
+		'/:userId/sessions/:sessionId/regenerate-meal',
+        aiLimiter,
 		validateRequest({
-			params: RegenerateSingleParamsSchema,
+			params: SessionParamsSchema,
 			body: RegenerateSingleBodySchema
 		}),
 		controller.regenerateSingle.bind(controller)
 	)
 
+	// ============================================================
+	// REGENERATE FULL PLAN
+	// ============================================================
+
 	router.post(
-		'/sessions/:sessionId/confirm',
+		'/:userId/sessions/:sessionId/regenerate',
+        aiLimiter,
 		validateRequest({
-			params: ConfirmMealPlanParamsSchema,
-			body: ConfirmMealPlanBodySchema
+			params: SessionParamsSchema,
+			body: RegenerateFullBodySchema
+		}),
+		controller.regenerateFull.bind(controller)
+	)
+
+	// ============================================================
+	// CONFIRM PLAN
+	// ============================================================
+
+	router.post(
+		'/:userId/sessions/:sessionId/confirm',
+		validateRequest({
+			params: SessionParamsSchema
 		}),
 		controller.confirm.bind(controller)
+	)
+
+	// ============================================================
+	// GET HISTORY
+	// ============================================================
+
+	router.get(
+		'/:userId/meal-plans',
+		validateRequest({ params: UserIdParamsSchema }),
+		controller.getAll.bind(controller)
+	)
+
+	// ============================================================
+	// GET SINGLE PLAN
+	// ============================================================
+
+	router.get(
+		'/:userId/meal-plans/:planId',
+		validateRequest({ params: PlanParamsSchema }),
+		controller.getById.bind(controller)
+	)
+
+	// ============================================================
+	// DELETE PLAN
+	// ============================================================
+
+	router.delete(
+		'/:userId/meal-plans/:planId',
+		validateRequest({ params: PlanParamsSchema }),
+		controller.delete.bind(controller)
 	)
 
 	return router

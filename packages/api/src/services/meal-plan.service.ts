@@ -1,63 +1,109 @@
-import { IDataAccess } from '@mealy/engine'
-import { ContextBuilder } from '@mealy/engine'
-import {
-  MealPlanGenerator,
-  GenerationOptions
-} from '@mealy/engine'
+import { IDataAccess, MealPlan } from '@mealy/engine'
+import { ContextBuilder, MealPlanGenerator, GenerationOptions } from '@mealy/engine'
+import { HttpError } from '../errors/http-error'
+import { SessionService } from './session.service'
 
 export class MealPlanService {
 
-    private dataAccess: IDataAccess
-    private contextBuilder: ContextBuilder
-    private generator: MealPlanGenerator
+	private readonly dataAccess: IDataAccess
+	private readonly contextBuilder: ContextBuilder
+	private readonly generator: MealPlanGenerator
 
-    constructor(dataAccess: IDataAccess) {
-        this.dataAccess = dataAccess
-        this.contextBuilder = new ContextBuilder()
-        this.generator = new MealPlanGenerator()
-    }
+	constructor(dataAccess: IDataAccess) {
+		this.dataAccess = dataAccess
+		this.contextBuilder = new ContextBuilder()
+		this.generator = new MealPlanGenerator()
+	}
 
-    // ============================================================
-    // GENERATE NEW PLAN
-    // ============================================================
+	// ============================================================
+	// INTERNAL GUARDS
+	// ============================================================
 
-    async generateMealPlan(
-        userId: string,
-        options?: GenerationOptions
-    ) {
+	private async ensureUserExists(userId: string) {
 
-        const user = await this.ensureUserExists(userId)
+		const user = await this.dataAccess.findUserById(userId)
 
-        // 🧠 Generate first
-        const tempContext = this.contextBuilder.buildFullContext(user, null)
+		if (!user) {
+			throw new HttpError('User not found', 404)
+		}
 
-        const result = await this.generator.generateMealPlan(
-            tempContext,
-            options
-        )
+		return user
+	}
 
-        // 💾 Persist in one atomic step
-        const session = await this.dataAccess.createSession(
-            userId,
-            result.mealPlan
-        )
+	private async ensureSessionOwnership(userId: string, sessionId: string) {
 
-        return {
-            sessionId: session.id,
-            mealPlan: result.mealPlan,
-            metadata: {
-                tokensUsed: result.tokensUsed.totalTokens,
-                generationTime: result.generationTime
-            }
+		const session = await this.dataAccess.findSessionById(sessionId)
+
+		if (!session || session.userId !== userId) {
+			throw new HttpError('Session not found', 404)
+		}
+
+		return session
+	}
+
+    private async ensureSessionExists(sessionId: string) {
+
+        const session = await this.dataAccess.findSessionById(sessionId)
+
+        if (!session) {
+            throw new HttpError('Session not found', 404)
         }
+
+        return session
     }
 
 
-    // ============================================================
-    // REGENERATE SINGLE MEAL
-    // ============================================================
+	private async ensureMealPlanOwnership(userId: string, planId: string) {
 
-    async regenerateSingleMeal(
+		const plan = await this.dataAccess.findMealPlanById(planId)
+
+		if (!plan || plan.userId !== userId) {
+			throw new HttpError('Meal plan not found', 404)
+		}
+
+		return plan
+	}
+
+	// ============================================================
+	// GENERATE NEW PLAN
+	// ============================================================
+
+	async generateMealPlan(
+		userId: string,
+		options?: GenerationOptions
+	) {
+
+		const user = await this.ensureUserExists(userId)
+
+		const context = this.contextBuilder.buildFullContext(user, null)
+
+		const result = await this.generator.generateMealPlan(
+			context,
+			options
+		)
+
+		const session = await this.dataAccess.createSession(userId)
+
+		await this.dataAccess.updateSessionMealPlan(
+			session.id,
+			result.mealPlan
+		)
+
+		return {
+			sessionId: session.id,
+			mealPlan: result.mealPlan,
+			metadata: {
+				tokensUsed: result.tokensUsed.totalTokens,
+				generationTime: result.generationTime
+			}
+		}
+	}
+
+	// ============================================================
+	// REGENERATE SINGLE MEAL
+	// ============================================================
+
+	async regenerateSingleMeal(
         userId: string,
         sessionId: string,
         mealId: string,
@@ -65,147 +111,127 @@ export class MealPlanService {
         options?: GenerationOptions
     ) {
 
-        const { user, session } =
-        await this.ensureSessionOwnership(userId, sessionId)
+        const user = await this.ensureUserExists(userId)
 
+        const session = await this.ensureSessionExists(sessionId)
+
+        if (session.userId !== userId) {
+            throw new HttpError('Unauthorized', 403)
+        }
+
+        // 🧠 Build context from CURRENT session (no DB writes yet)
         const context = this.contextBuilder.buildFullContext(
-        user,
-        this.contextBuilder.buildSessionContext(session)
+            user,
+            this.contextBuilder.buildSessionContext(session)
         )
 
-        // 🧠 Generate first
+        // 🧠 AI first
         const result = await this.generator.regenerateSingleMeal(
-        context,
-        mealId,
-        reason,
-        options
+            context,
+            mealId,
+            reason,
+            options
         )
 
-        // 💾 Atomic persistence
-        await this.dataAccess.applySessionRegeneration(
-        sessionId,
-        result.mealPlan,
-        {
+        // 💾 Only after AI success → persist mutation
+
+        await this.dataAccess.addSessionModification(sessionId, {
             action: 'regenerate-meal',
             mealId,
             reason
-        }
+        })
+
+        await this.dataAccess.updateSessionMealPlan(
+            sessionId,
+            result.mealPlan
         )
 
         return result.mealPlan
     }
 
-    // ============================================================
-    // REGENERATE FULL PLAN
-    // ============================================================
 
-    async regenerateFullPlan(
-        userId: string,
-        sessionId: string,
-        reason: string,
-        options?: GenerationOptions
-    ) {
+	// ============================================================
+	// REGENERATE FULL PLAN
+	// ============================================================
 
-        const { user, session } =
-        await this.ensureSessionOwnership(userId, sessionId)
+	async regenerateFullPlan(
+		userId: string,
+		sessionId: string,
+		reason: string,
+		options?: GenerationOptions
+	) {
 
-        const context = this.contextBuilder.buildFullContext(
-        user,
-        this.contextBuilder.buildSessionContext(session)
-        )
+		const user = await this.ensureUserExists(userId)
 
-        const result = await this.generator.regenerateFullPlan(
-        context,
-        reason,
-        options
-        )
+		await this.ensureSessionOwnership(userId, sessionId)
 
-        await this.dataAccess.applySessionRegeneration(
-        sessionId,
-        result.mealPlan,
-        {
-            action: 'regenerate-all',
-            reason
-        }
-        )
+		await this.dataAccess.addSessionModification(sessionId, {
+			action: 'regenerate-all',
+			reason
+		})
 
-        return result.mealPlan
-    }
+		const updatedSession = await this.dataAccess.findSessionById(sessionId)
 
-    // ============================================================
-    // CONFIRM PLAN
-    // ============================================================
+		const context = this.contextBuilder.buildFullContext(
+			user,
+			this.contextBuilder.buildSessionContext(updatedSession!)
+		)
 
-    async confirmMealPlan(userId: string, sessionId: string) {
+		const result = await this.generator.regenerateFullPlan(
+			context,
+			reason,
+			options
+		)
 
-        const { session } =
-        await this.ensureSessionOwnership(userId, sessionId)
+		await this.dataAccess.updateSessionMealPlan(
+			sessionId,
+			result.mealPlan
+		)
 
-        if (!session.currentMealPlan) {
-        throw new Error('No meal plan to confirm')
-        }
+		return result.mealPlan
+	}
 
-        return this.dataAccess.saveMealPlan(
-        userId,
-        session.currentMealPlan
-        )
-    }
+	// ============================================================
+	// CONFIRM PLAN
+	// ============================================================
 
-    // ============================================================
-    // DELETE PLAN
-    // ============================================================
+	async confirmMealPlan(userId: string, sessionId: string) {
 
-    async deleteMealPlan(userId: string, planId: string) {
+		const session = await this.ensureSessionOwnership(userId, sessionId)
 
-        const plan = await this.dataAccess.findMealPlanById(planId)
+		if (!session.currentMealPlan) {
+			throw new HttpError('No meal plan to confirm', 400)
+		}
 
-        if (!plan || plan.userId !== userId) {
-        throw new Error('Meal plan not found')
-        }
+		return this.dataAccess.saveMealPlan(
+			userId,
+			session.currentMealPlan
+		)
+	}
 
-        await this.dataAccess.deleteMealPlan(planId)
+	// ============================================================
+	// DELETE PLAN
+	// ============================================================
 
-        return true
-    }
+	async deleteMealPlan(userId: string, planId: string) {
 
-    // ============================================================
-    // HISTORY
-    // ============================================================
+		await this.ensureMealPlanOwnership(userId, planId)
 
-    async getMealPlanHistory(userId: string) {
-        return this.dataAccess.findMealPlansByUserId(userId)
-    }
+		await this.dataAccess.deleteMealPlan(planId)
 
-    async getMealPlanById(userId: string, planId: string) {
-        const plan = await this.dataAccess.findMealPlanById(planId)
+		return true
+	}
 
-        if (!plan || plan.userId !== userId) {
-        throw new Error('Meal plan not found')
-        }
+	// ============================================================
+	// HISTORY
+	// ============================================================
 
-        return plan
-    }
+	async getMealPlanHistory(userId: string) {
+		await this.ensureUserExists(userId)
+		return this.dataAccess.findMealPlansByUserId(userId)
+	}
 
-    // ============================================================
-    // PRIVATE HELPERS
-    // ============================================================
-
-    private async ensureUserExists(userId: string) {
-        const user = await this.dataAccess.findUserById(userId)
-        if (!user) throw new Error('User not found')
-        return user
-    }
-
-    private async ensureSessionOwnership(userId: string, sessionId: string) {
-        const user = await this.ensureUserExists(userId)
-
-        const session = await this.dataAccess.findSessionById(sessionId)
-        if (!session) throw new Error('Session not found')
-
-        if (session.userId !== userId) {
-        throw new Error('Unauthorized')
-        }
-
-        return { user, session }
-    }
+	async getMealPlanById(userId: string, planId: string) {
+		return this.ensureMealPlanOwnership(userId, planId)
+	}
 }

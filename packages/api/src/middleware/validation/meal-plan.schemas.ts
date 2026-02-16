@@ -1,31 +1,38 @@
 import { z } from 'zod'
 
-export const GenerateMealPlanParamsSchema = z.object({
-	userId: z.string().uuid()
-})
+// ============================================================
+// GENERATION OPTIONS
+// ============================================================
+
+export const GenerationOptionsSchema = z.object({
+	provider: z.enum(['openai', 'anthropic']).optional(),
+	temperature: z.number().min(0).max(1).optional(),
+	maxTokens: z.number().positive().optional(),
+}).strict()
+
+// ============================================================
+// GENERATE MEAL PLAN
+// ============================================================
 
 export const GenerateMealPlanBodySchema = z.object({
-	options: z.object({
-		provider: z.enum(['openai', 'anthropic']).optional(),
-		temperature: z.number().min(0).max(1).optional(),
-		maxTokens: z.number().positive().optional(),
-	}).optional()
-})
+	options: GenerationOptionsSchema.optional()
+}).strict()
 
-export const RegenerateSingleParamsSchema = z.object({
-	sessionId: z.string().uuid()
-})
+// ============================================================
+// REGENERATE SINGLE MEAL
+// ============================================================
 
 export const RegenerateSingleBodySchema = z.object({
-	userId: z.string().uuid(),
-	mealId: z.string(),
-	reason: z.string().min(1)
-})
+	mealId: z.string().min(1),
+	reason: z.string().min(1),
+	options: GenerationOptionsSchema.optional()
+}).strict()
 
-export const ConfirmMealPlanParamsSchema = z.object({
-	sessionId: z.string().uuid()
-})
+// ============================================================
+// REGENERATE FULL PLAN
+// ============================================================
 
-export const ConfirmMealPlanBodySchema = z.object({
-	userId: z.string().uuid()
-})
+export const RegenerateFullBodySchema = z.object({
+	reason: z.string().min(1),
+	options: GenerationOptionsSchema.optional()
+}).strict()
