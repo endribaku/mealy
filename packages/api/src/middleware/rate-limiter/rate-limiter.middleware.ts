@@ -1,30 +1,23 @@
-import rateLimit from 'express-rate-limit'
-import { Request } from 'express'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 
-// Generic limiter factory
 export function createRateLimiter(options?: {
-	windowMs?: number
-	max?: number
-	message?: string
+  windowMs?: number
+  max?: number
+  message?: string
 }) {
+  return rateLimit({
+    windowMs: options?.windowMs ?? 15 * 60 * 1000,
+    max: options?.max ?? 100,
+    standardHeaders: true,
+    legacyHeaders: false,
 
-	return rateLimit({
-		windowMs: options?.windowMs ?? 15 * 60 * 1000, // 15 min
-		max: options?.max ?? 100, // 100 requests per window
-		standardHeaders: true,
-		legacyHeaders: false,
+    keyGenerator: (req) => {
+      return ipKeyGenerator(req.ip!)
+    },
 
-		keyGenerator: (req: Request) => {
-			return req.ip ?? 'unknown'
-		},
-
-		handler: (req, res) => {
-			res.status(429).json({
-				success: false,
-				message:
-					options?.message ??
-					'Too many requests, please try again later.'
-			})
-		}
-	})
+    message: {
+      success: false,
+      message: options?.message ?? 'Too many requests'
+    }
+  })
 }
