@@ -45,8 +45,14 @@ export type {
 // ============================================================
 
 
-export type { IDataAccess } from './core/data-access.js'
+// interfaces
 
+export type { IDataAccess } from './core/data-access.js'
+export type { IContextBuilder } from './core/interfaces/context-builder.interface.js'
+export type { IMealPlanGenerator } from './core/interfaces/meal-plan-generator.interface.js'
+
+
+// types
 export type {
   User,
   UserProfileUpdate,

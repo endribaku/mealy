@@ -1,4 +1,5 @@
 import { User } from '../core/schemas/user-schemas.js'
+import { IContextBuilder } from './interfaces/context-builder.interface.js'
 
 /**
  * Session Context (AI-relevant only)
@@ -28,7 +29,7 @@ export interface FullContext {
  * Context Builder
  * Pure domain logic — no database access.
  */
-export class ContextBuilder {
+export class ContextBuilder implements IContextBuilder {
 
   /**
    * Build Full Context

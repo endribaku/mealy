@@ -12,6 +12,7 @@ import {
   sanitizeSpecialInstructions,
   sanitizeReason
 } from '../../utils/input-sanitizer.js'
+import { IMealPlanGenerator } from '../interfaces/meal-plan-generator.interface.js'
 
 export enum AIProvider {
   ANTHROPIC = 'anthropic',
@@ -42,7 +43,7 @@ export interface GenerationResult {
  * PURE ENGINE ORCHESTRATOR
  * No database access.
  */
-export class MealPlanGenerator {
+export class MealPlanGenerator implements IMealPlanGenerator {
     private promptBuilder: PromptBuilder
 
     constructor() {
