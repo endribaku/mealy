@@ -3,6 +3,8 @@ import helmet from 'helmet'
 import cors from 'cors'
 import morgan from 'morgan'
 import { SupabaseDataAccess } from '@mealy/data'
+import {ContextBuilder, MealPlanGenerator} from '@mealy/engine'
+
 import { MealPlanService } from './services/meal-plan.service'
 
 import { MealPlanController } from './controllers/meal-plan.controller'
@@ -58,11 +60,13 @@ export function createApp() {
     })
 
 
-	// Infrastructure
+	// Infrastructure and other service dependencies
 	const dataAccess = new SupabaseDataAccess()
+    const contextBuilder = new ContextBuilder()
+    const generator = new MealPlanGenerator()
 
 	// Services
-	const mealPlanService = new MealPlanService(dataAccess)
+	const mealPlanService = new MealPlanService(dataAccess, contextBuilder, generator)
     const userService = new UserService(dataAccess)
     const sessionService = new SessionService(dataAccess)
 

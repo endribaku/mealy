@@ -1,7 +1,8 @@
-import { createApp } from './app'
+import { createProductionApp } from './app/create-production-app'
 
-const app = createApp()
+const app = createProductionApp()
 
 app.listen(3000, () => {
-	console.log('Server running on http://localhost:3000')
+  console.log('Server running on port 3000')
 })
+
