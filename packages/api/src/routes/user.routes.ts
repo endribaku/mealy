@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { validateRequest } from 'zod-express-middleware'
 import { UserController } from '../controllers/user.controller'
+import { validate } from '../middleware/validation/validate'
 
 import {
 	UserIdParamsSchema
@@ -24,7 +24,7 @@ export function createUserRoutes(
 
 	router.post(
 		'/',
-		validateRequest({ body: CreateUserBodySchema }),
+		validate(CreateUserBodySchema, 'body'),
 		controller.create.bind(controller)
 	)
 
@@ -34,7 +34,7 @@ export function createUserRoutes(
 
 	router.get(
 		'/:userId',
-		validateRequest({ params: UserIdParamsSchema }),
+		validate(UserIdParamsSchema, 'params'),
 		controller.getById.bind(controller)
 	)
 
@@ -44,10 +44,8 @@ export function createUserRoutes(
 
 	router.patch(
 		'/:userId/profile',
-		validateRequest({
-			params: UserIdParamsSchema,
-			body: UpdateProfileBodySchema
-		}),
+		validate(UserIdParamsSchema, 'params'),
+		validate(UpdateProfileBodySchema, 'body'),
 		controller.updateProfile.bind(controller)
 	)
 
@@ -57,10 +55,8 @@ export function createUserRoutes(
 
 	router.patch(
 		'/:userId/preferences',
-		validateRequest({
-			params: UserIdParamsSchema,
-			body: UpdatePreferencesBodySchema
-		}),
+		validate(UserIdParamsSchema, 'params'),
+		validate(UpdatePreferencesBodySchema, 'body'),
 		controller.updatePreferences.bind(controller)
 	)
 
@@ -70,10 +66,8 @@ export function createUserRoutes(
 
 	router.patch(
 		'/:userId/restrictions',
-		validateRequest({
-			params: UserIdParamsSchema,
-			body: UpdateRestrictionsBodySchema
-		}),
+		validate(UserIdParamsSchema, 'params'),
+		validate(UpdateRestrictionsBodySchema, 'body'),
 		controller.updateRestrictions.bind(controller)
 	)
 
@@ -83,7 +77,7 @@ export function createUserRoutes(
 
 	router.delete(
 		'/:userId',
-		validateRequest({ params: UserIdParamsSchema }),
+		validate(UserIdParamsSchema, 'params'),
 		controller.delete.bind(controller)
 	)
 

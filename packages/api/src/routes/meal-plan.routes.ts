@@ -1,12 +1,13 @@
 import { Router } from 'express'
-import { validateRequest } from 'zod-express-middleware'
 import { MealPlanController } from '../controllers/meal-plan.controller'
 import { RateLimitRequestHandler } from 'express-rate-limit'
+import { validate } from '../middleware/validation/validate'
+
 import {
 	UserIdParamsSchema,
 	SessionParamsSchema,
 	PlanParamsSchema
-} from '../middleware/validation/common-param.schemas.ts'
+} from '../middleware/validation/common-param.schemas'
 
 import {
 	GenerateMealPlanBodySchema,
@@ -16,7 +17,7 @@ import {
 
 export function createMealPlanRoutes(
 	controller: MealPlanController,
-    aiLimiter: RateLimitRequestHandler
+	aiLimiter: RateLimitRequestHandler
 ) {
 	const router = Router()
 
@@ -26,11 +27,9 @@ export function createMealPlanRoutes(
 
 	router.post(
 		'/:userId/meal-plans',
-        aiLimiter,
-		validateRequest({
-			params: UserIdParamsSchema,
-			body: GenerateMealPlanBodySchema
-		}),
+		aiLimiter,
+		validate(UserIdParamsSchema, 'params'),
+		validate(GenerateMealPlanBodySchema, 'body'),
 		controller.generate.bind(controller)
 	)
 
@@ -40,11 +39,9 @@ export function createMealPlanRoutes(
 
 	router.post(
 		'/:userId/sessions/:sessionId/regenerate-meal',
-        aiLimiter,
-		validateRequest({
-			params: SessionParamsSchema,
-			body: RegenerateSingleBodySchema
-		}),
+		aiLimiter,
+		validate(SessionParamsSchema, 'params'),
+		validate(RegenerateSingleBodySchema, 'body'),
 		controller.regenerateSingle.bind(controller)
 	)
 
@@ -54,11 +51,9 @@ export function createMealPlanRoutes(
 
 	router.post(
 		'/:userId/sessions/:sessionId/regenerate',
-        aiLimiter,
-		validateRequest({
-			params: SessionParamsSchema,
-			body: RegenerateFullBodySchema
-		}),
+		aiLimiter,
+		validate(SessionParamsSchema, 'params'),
+		validate(RegenerateFullBodySchema, 'body'),
 		controller.regenerateFull.bind(controller)
 	)
 
@@ -68,9 +63,7 @@ export function createMealPlanRoutes(
 
 	router.post(
 		'/:userId/sessions/:sessionId/confirm',
-		validateRequest({
-			params: SessionParamsSchema
-		}),
+		validate(SessionParamsSchema, 'params'),
 		controller.confirm.bind(controller)
 	)
 
@@ -80,7 +73,7 @@ export function createMealPlanRoutes(
 
 	router.get(
 		'/:userId/meal-plans',
-		validateRequest({ params: UserIdParamsSchema }),
+		validate(UserIdParamsSchema, 'params'),
 		controller.getAll.bind(controller)
 	)
 
@@ -90,7 +83,7 @@ export function createMealPlanRoutes(
 
 	router.get(
 		'/:userId/meal-plans/:planId',
-		validateRequest({ params: PlanParamsSchema }),
+		validate(PlanParamsSchema, 'params'),
 		controller.getById.bind(controller)
 	)
 
@@ -100,7 +93,7 @@ export function createMealPlanRoutes(
 
 	router.delete(
 		'/:userId/meal-plans/:planId',
-		validateRequest({ params: PlanParamsSchema }),
+		validate(PlanParamsSchema, 'params'),
 		controller.delete.bind(controller)
 	)
 

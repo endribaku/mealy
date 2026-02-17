@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { validateRequest } from 'zod-express-middleware'
 import { SessionController } from '../controllers/session.controller'
+import { validate } from '../middleware/validation/validate'
 
 import {
 	SessionParamsSchema
@@ -17,7 +17,7 @@ export function createSessionRoutes(
 
 	router.get(
 		'/:userId/sessions/:sessionId',
-		validateRequest({ params: SessionParamsSchema }),
+		validate(SessionParamsSchema, 'params'),
 		controller.getById.bind(controller)
 	)
 
@@ -27,7 +27,7 @@ export function createSessionRoutes(
 
 	router.delete(
 		'/:userId/sessions/:sessionId',
-		validateRequest({ params: SessionParamsSchema }),
+		validate(SessionParamsSchema, 'params'),
 		controller.delete.bind(controller)
 	)
 
