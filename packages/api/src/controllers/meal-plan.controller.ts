@@ -49,15 +49,14 @@ export class MealPlanController {
 
 	// ============================================================
 	// REGENERATE SINGLE MEAL
-	// POST /api/sessions/:sessionId/regenerate-meal
+	// POST /api/users/:userId/sessions/:sessionId/regenerate-meal
 	// ============================================================
 
 	async regenerateSingle(
 		req: Request<
-			{ sessionId: string },
+			{ userId: string; sessionId: string },
 			BasicSuccessResponse<{ mealPlan: MealPlan }>,
 			{
-				userId: string
 				mealId: string
 				reason: string
 				options?: GenerationOptions
@@ -68,8 +67,8 @@ export class MealPlanController {
 	) {
 		try {
 
-			const { sessionId } = req.params
-			const { userId, mealId, reason, options } = req.body
+			const { userId, sessionId } = req.params
+			const { mealId, reason, options } = req.body
 
 			const mealPlan = await this.service.regenerateSingleMeal(
 				userId,
@@ -91,15 +90,14 @@ export class MealPlanController {
 
 	// ============================================================
 	// REGENERATE FULL PLAN
-	// POST /api/sessions/:sessionId/regenerate
+	// POST /api/users/:userId/sessions/:sessionId/regenerate
 	// ============================================================
 
 	async regenerateFull(
 		req: Request<
-			{ sessionId: string },
+			{ userId: string; sessionId: string },
 			BasicSuccessResponse<{ mealPlan: MealPlan }>,
 			{
-				userId: string
 				reason: string
 				options?: GenerationOptions
 			}
@@ -109,8 +107,8 @@ export class MealPlanController {
 	) {
 		try {
 
-			const { sessionId } = req.params
-			const { userId, reason, options } = req.body
+			const { userId, sessionId } = req.params
+			const { reason, options } = req.body
 
 			const mealPlan = await this.service.regenerateFullPlan(
 				userId,
@@ -131,22 +129,20 @@ export class MealPlanController {
 
 	// ============================================================
 	// CONFIRM PLAN
-	// POST /api/sessions/:sessionId/confirm
+	// POST /api/users/:userId/sessions/:sessionId/confirm
 	// ============================================================
 
 	async confirm(
 		req: Request<
-			{ sessionId: string },
-			BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>,
-			{ userId: string }
+			{ userId: string; sessionId: string },
+			BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>
 		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
 
-			const { sessionId } = req.params
-			const { userId } = req.body
+			const { userId, sessionId } = req.params
 
 			const savedPlan = await this.service.confirmMealPlan(
 				userId,
@@ -163,7 +159,7 @@ export class MealPlanController {
 		}
 	}
 
-    // ============================================================
+	// ============================================================
 	// GET MEAL PLAN HISTORY
 	// GET /api/users/:userId/meal-plans
 	// ============================================================

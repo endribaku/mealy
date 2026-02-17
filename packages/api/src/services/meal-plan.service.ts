@@ -1,19 +1,18 @@
 import { IDataAccess, MealPlan } from '@mealy/engine'
-import { ContextBuilder, MealPlanGenerator, GenerationOptions } from '@mealy/engine'
+import { ContextBuilder, MealPlanGenerator, GenerationOptions, IContextBuilder, IMealPlanGenerator } from '@mealy/engine'
 import { HttpError } from '../errors/http-error'
 import { SessionService } from './session.service'
 
 export class MealPlanService {
 
-	private readonly dataAccess: IDataAccess
-	private readonly contextBuilder: ContextBuilder
-	private readonly generator: MealPlanGenerator
+	constructor(
+    private readonly dataAccess: IDataAccess,
+    private readonly contextBuilder: IContextBuilder,
+    private readonly generator: IMealPlanGenerator
+    ) {}
 
-	constructor(dataAccess: IDataAccess) {
-		this.dataAccess = dataAccess
-		this.contextBuilder = new ContextBuilder()
-		this.generator = new MealPlanGenerator()
-	}
+
+    
 
 	// ============================================================
 	// INTERNAL GUARDS
