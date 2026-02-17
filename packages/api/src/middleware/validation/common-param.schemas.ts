@@ -5,17 +5,17 @@ import { z } from 'zod'
 // ============================================================
 
 export const UserIdParamsSchema = z.object({
-	userId: z.string().min(1)
+	userId: z.uuid()
 })
 
 export const SessionParamsSchema = z.object({
-	userId: z.string().min(1),
-	sessionId: z.string().min(1)
+	userId: z.uuid(),
+	sessionId: z.uuid()
 })
 
 export const PlanParamsSchema = z.object({
-	userId: z.string().min(1),
-	planId: z.string().min(1)
+	userId: z.uuid(),
+	planId: z.uuid()
 })
 
 // ============================================================
