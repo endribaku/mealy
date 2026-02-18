@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { UserService } from '../services/user.service'
+import { logger } from '../misc/logger'
 
 export class UserController {
 
@@ -40,7 +41,18 @@ export class UserController {
 		next: NextFunction
 	) {
 		try {
+
+			logger.info({
+				event: 'user_create_requested'
+			})
+
 			const user = await this.service.create(req.body)
+
+			logger.info({
+				event: 'user_create_success',
+				userId: user.id
+			})
+
 
 			return res.status(201).json({
 				success: true,
@@ -63,10 +75,21 @@ export class UserController {
 		try {
 			const { userId } = req.params
 
+			logger.info({
+				event: 'user_update_profile_requested',
+				userId
+			})
+
 			const updatedUser = await this.service.updateProfile(
 				userId,
 				req.body
 			)
+
+			logger.info({
+				event: 'user_update_profile_success',
+				userId
+			})
+
 
 			return res.json({
 				success: true,
@@ -89,10 +112,21 @@ export class UserController {
 		try {
 			const { userId } = req.params
 
+			logger.info({
+				event: 'user_update_preferences_requested',
+				userId
+			})
+
 			const updatedUser = await this.service.updatePreferences(
 				userId,
 				req.body
 			)
+
+			logger.info({
+				event: 'user_update_preferences_success',
+				userId
+			})
+
 
 			return res.json({
 				success: true,
@@ -115,10 +149,20 @@ export class UserController {
 		try {
 			const { userId } = req.params
 
+			logger.info({
+				event: 'user_update_restrictions_requested',
+				userId
+			})
+
 			const updatedUser = await this.service.updateRestrictions(
 				userId,
 				req.body
 			)
+
+			logger.info({
+				event: 'user_update_restrictions_success',
+				userId
+			})
 
 			return res.json({
 				success: true,
@@ -141,7 +185,17 @@ export class UserController {
 		try {
 			const { userId } = req.params
 
+			logger.warn({
+				event: 'user_delete_requested',
+				userId
+			})
+
 			await this.service.delete(userId)
+			
+			logger.warn({
+				event: 'user_delete_success',
+				userId
+			})
 
 			return res.json({
 				success: true,

@@ -1,7 +1,9 @@
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
-import morgan from 'morgan'
+
+import { httpLogger } from './middleware/http-logger/http-logger.middleware'
+import { correlationIdMiddleware } from './middleware/correlation/correlation.middleware'
 import { SupabaseDataAccess } from '@mealy/data'
 import {ContextBuilder, MealPlanGenerator} from '@mealy/engine'
 
@@ -39,7 +41,8 @@ export function createApp() {
 	app.use(express.json())
 
 	// HTTP request logging
-	app.use(morgan('dev'))
+	app.use(correlationIdMiddleware)
+	app.use(httpLogger)
 
     // rate limiter logic
     

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { SessionService } from '../services/session.service'
 import { BasicSuccessResponse } from '../types/dto.types'
+import { logger } from '../misc/logger';
 
 export class SessionController {
 
@@ -59,10 +60,22 @@ export class SessionController {
 
 			const { userId, sessionId } = req.params
 
+			logger.info({
+				event: 'session_delete_requested',
+				userId,
+				sessionId
+			})
+
 			await this.service.delete(
 				userId,
 				sessionId
 			)
+
+			logger.info({
+				event: 'session_delete_success',
+				userId,
+				sessionId
+			})
 
 			return res.json({
 				success: true,

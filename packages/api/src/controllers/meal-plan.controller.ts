@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { MealPlanService } from '../services/meal-plan.service'
 import { GenerationOptions, MealPlan, StoredMealPlan } from '@mealy/engine'
-
+import { logger } from '../misc/logger'
 import {
 	GenerateMealPlanResponse,
 	BasicSuccessResponse
@@ -19,32 +19,41 @@ export class MealPlanController {
 	// ============================================================
 
 	async generate(
-		req: Request<
-			{ userId: string },
-			BasicSuccessResponse<GenerateMealPlanResponse>,
-			{ options?: GenerationOptions }
-		>,
-		res: Response,
-		next: NextFunction
+	req: Request<
+		{ userId: string },
+		BasicSuccessResponse<GenerateMealPlanResponse>,
+		{ options?: GenerationOptions }
+	>,
+	res: Response,
+	next: NextFunction
 	) {
-		try {
+	try {
+		const { userId } = req.params
+		const { options } = req.body
 
-			const { userId } = req.params
-			const { options } = req.body
+		logger.info({
+		event: 'meal_plan_generate_requested',
+		userId
+		})
 
-			const result = await this.service.generateMealPlan(
-				userId,
-				options
-			)
+		const result = await this.service.generateMealPlan(
+		userId,
+		options
+		)
 
-			return res.status(201).json({
-				success: true,
-				data: result
-			})
+		logger.info({
+		event: 'meal_plan_generate_success',
+		userId
+		})
 
-		} catch (error) {
-			next(error)
-		}
+		return res.status(201).json({
+		success: true,
+		data: result
+		})
+
+	} catch (error) {
+		next(error)
+	}
 	}
 
 	// ============================================================
@@ -70,6 +79,13 @@ export class MealPlanController {
 			const { userId, sessionId } = req.params
 			const { mealId, reason, options } = req.body
 
+			logger.info({
+			event: 'meal_regenerate_single_requested',
+			userId,
+			sessionId,
+			mealId
+			})
+
 			const mealPlan = await this.service.regenerateSingleMeal(
 				userId,
 				sessionId,
@@ -77,6 +93,13 @@ export class MealPlanController {
 				reason,
 				options
 			)
+
+			logger.info({
+			event: 'meal_regenerate_single_success',
+			userId,
+			sessionId,
+			mealId
+			})
 
 			return res.json({
 				success: true,
@@ -109,6 +132,13 @@ export class MealPlanController {
 
 			const { userId, sessionId } = req.params
 			const { reason, options } = req.body
+			
+			logger.info({
+				event: 'meal_plan_regenerate_full_requested',
+				userId,
+				sessionId,
+				reason
+			})
 
 			const mealPlan = await this.service.regenerateFullPlan(
 				userId,
@@ -116,6 +146,12 @@ export class MealPlanController {
 				reason,
 				options
 			)
+
+			logger.info({
+				event: 'meal_plan_regenerate_full_success',
+				userId,
+				sessionId
+			})
 
 			return res.json({
 				success: true,
@@ -144,10 +180,22 @@ export class MealPlanController {
 
 			const { userId, sessionId } = req.params
 
+			logger.info({
+				event: 'meal_plan_confirm_requested',
+				userId,
+				sessionId
+			})
+
 			const savedPlan = await this.service.confirmMealPlan(
 				userId,
 				sessionId
 			)
+
+			logger.info({
+				event: 'meal_plan_confirm_success',
+				userId,
+				sessionId
+			})
 
 			return res.json({
 				success: true,
@@ -237,10 +285,22 @@ export class MealPlanController {
 
 			const { userId, planId } = req.params
 
+			logger.info({
+				event: 'meal_plan_delete_requested',
+				userId,
+				planId
+			})
+
 			await this.service.deleteMealPlan(
 				userId,
 				planId
 			)
+
+			logger.info({
+				event: 'meal_plan_delete_success',
+				userId,
+				planId
+			})
 
 			return res.json({
 				success: true,
