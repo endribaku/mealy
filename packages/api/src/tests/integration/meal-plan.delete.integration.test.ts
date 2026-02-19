@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
+describe('DELETE /api/meal-plans/:planId (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -18,27 +20,29 @@ describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
 
   const fakePlan = {
     id: validPlanId,
-    userId: validUserId,
+    userId: validUserId,   // must match testUser.id
     days: []
   } as any
 
-  const endpoint = (userId: string, planId: string) =>
-    `/api/users/${userId}/meal-plans/${planId}`
+  const endpoint = (planId: string) =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.MEAL_PLANS}/${planId}`
 
   beforeEach(() => {
 
     mockDataAccess = {
       findMealPlanById: jest.fn(),
-      deleteMealPlan: jest.fn()
+      deleteMealPlan: jest.fn(),
+      findUserById: jest.fn() // important if service verifies user existence
     } as any
 
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: {id: validUserId}
     })
   })
 
@@ -49,7 +53,7 @@ describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
   it('returns 400 if params invalid', async () => {
 
     const res = await request(app)
-      .delete(endpoint('invalid-id', validPlanId))
+      .delete(endpoint('invalid-id'))
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -64,7 +68,7 @@ describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
     mockDataAccess.findMealPlanById.mockResolvedValue(null)
 
     const res = await request(app)
-      .delete(endpoint(validUserId, validPlanId))
+      .delete(endpoint(validPlanId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
@@ -85,7 +89,7 @@ describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
     })
 
     const res = await request(app)
-      .delete(endpoint(validUserId, validPlanId))
+      .delete(endpoint(validPlanId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
@@ -103,7 +107,7 @@ describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
     mockDataAccess.findMealPlanById.mockResolvedValue(fakePlan)
 
     const res = await request(app)
-      .delete(endpoint(validUserId, validPlanId))
+      .delete(endpoint(validPlanId))
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -112,5 +116,4 @@ describe('DELETE /api/users/:userId/meal-plans/:planId (Integration)', () => {
     expect(mockDataAccess.deleteMealPlan)
       .toHaveBeenCalledWith(validPlanId)
   })
-
 })

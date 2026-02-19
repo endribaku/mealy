@@ -1,10 +1,7 @@
 import { Router } from 'express'
 import { UserController } from '../controllers/user.controller'
 import { validate } from '../middleware/validation/validate'
-
-import {
-	UserIdParamsSchema
-} from '../middleware/validation/common-param.schemas'
+import { ROUTE_SEGMENTS } from './routes.constants'
 
 import {
 	CreateUserBodySchema,
@@ -13,73 +10,54 @@ import {
 	UpdateRestrictionsBodySchema
 } from '../middleware/validation/user.schemas'
 
-export function createUserRoutes(
-	controller: UserController
-) {
+export function createUserRoutes(controller: UserController) {
 	const router = Router()
 
-	// ============================================================
-	// CREATE USER
-	// ============================================================
+	const me = `/${ROUTE_SEGMENTS.ME}`
+	const profile = `/${ROUTE_SEGMENTS.PROFILE}`
+	const preferences = `/${ROUTE_SEGMENTS.PREFERENCES}`
+	const restrictions = `/${ROUTE_SEGMENTS.RESTRICTIONS}`
 
+	// POST /users/
 	router.post(
 		'/',
 		validate(CreateUserBodySchema, 'body'),
 		controller.create.bind(controller)
 	)
 
-	// ============================================================
-	// GET USER
-	// ============================================================
-
+	// GET /users/me
 	router.get(
-		'/:userId',
-		validate(UserIdParamsSchema, 'params'),
+		me,
 		controller.getById.bind(controller)
 	)
 
-	// ============================================================
-	// UPDATE PROFILE
-	// ============================================================
-
+	// PATCH /users/me/profile
 	router.patch(
-		'/:userId/profile',
-		validate(UserIdParamsSchema, 'params'),
+		`${me}${profile}`,
 		validate(UpdateProfileBodySchema, 'body'),
 		controller.updateProfile.bind(controller)
 	)
 
-	// ============================================================
-	// UPDATE PREFERENCES
-	// ============================================================
-
+	// PATCH /users/me/preferences
 	router.patch(
-		'/:userId/preferences',
-		validate(UserIdParamsSchema, 'params'),
+		`${me}${preferences}`,
 		validate(UpdatePreferencesBodySchema, 'body'),
 		controller.updatePreferences.bind(controller)
 	)
 
-	// ============================================================
-	// UPDATE RESTRICTIONS
-	// ============================================================
-
+	// PATCH /users/me/restrictions
 	router.patch(
-		'/:userId/restrictions',
-		validate(UserIdParamsSchema, 'params'),
+		`${me}${restrictions}`,
 		validate(UpdateRestrictionsBodySchema, 'body'),
 		controller.updateRestrictions.bind(controller)
 	)
 
-	// ============================================================
-	// DELETE USER
-	// ============================================================
-
+	// DELETE /users/me
 	router.delete(
-		'/:userId',
-		validate(UserIdParamsSchema, 'params'),
+		me,
 		controller.delete.bind(controller)
 	)
 
 	return router
 }
+

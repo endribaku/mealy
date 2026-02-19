@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('GET /api/users/:userId/meal-plans/:planId (Integration)', () => {
+describe('GET /api/meal-plans/:planId (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -22,8 +24,8 @@ describe('GET /api/users/:userId/meal-plans/:planId (Integration)', () => {
     days: []
   } as any
 
-  const endpoint = (userId: string, planId: string) =>
-    `/api/users/${userId}/meal-plans/${planId}`
+  const endpoint = (planId: string) =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.MEAL_PLANS}/${planId}`
 
   beforeEach(() => {
 
@@ -34,44 +36,30 @@ describe('GET /api/users/:userId/meal-plans/:planId (Integration)', () => {
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: {id: validUserId}
     })
   })
 
-  // ============================================================
-  // 1️⃣ Validation: Invalid UUID
-  // ============================================================
-
-  it('returns 400 if params invalid', async () => {
-
-    const res = await request(app)
-      .get(endpoint('invalid-id', validPlanId))
+  it('returns 400 if planId invalid', async () => {
+    const res = await request(app).get(endpoint('invalid-id'))
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
   })
 
-  // ============================================================
-  // 2️⃣ Plan Not Found
-  // ============================================================
-
   it('returns 404 if meal plan not found', async () => {
 
     mockDataAccess.findMealPlanById.mockResolvedValue(null)
 
-    const res = await request(app)
-      .get(endpoint(validUserId, validPlanId))
+    const res = await request(app).get(endpoint(validPlanId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 3️⃣ Plan Belongs to Another User
-  // ============================================================
 
   it('returns 404 if meal plan belongs to another user', async () => {
 
@@ -80,23 +68,17 @@ describe('GET /api/users/:userId/meal-plans/:planId (Integration)', () => {
       userId: 'another-user'
     })
 
-    const res = await request(app)
-      .get(endpoint(validUserId, validPlanId))
+    const res = await request(app).get(endpoint(validPlanId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
 
-  // ============================================================
-  // 4️⃣ Happy Path
-  // ============================================================
-
   it('returns meal plan successfully', async () => {
 
     mockDataAccess.findMealPlanById.mockResolvedValue(fakePlan)
 
-    const res = await request(app)
-      .get(endpoint(validUserId, validPlanId))
+    const res = await request(app).get(endpoint(validPlanId))
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -105,5 +87,4 @@ describe('GET /api/users/:userId/meal-plans/:planId (Integration)', () => {
     expect(mockDataAccess.findMealPlanById)
       .toHaveBeenCalledWith(validPlanId)
   })
-
 })

@@ -2,31 +2,32 @@ import { Router } from 'express'
 import { SessionController } from '../controllers/session.controller'
 import { validate } from '../middleware/validation/validate'
 
-import {
-	SessionParamsSchema
-} from '../middleware/validation/common-param.schemas'
+import { ROUTE_SEGMENTS } from './routes.constants'
+import { SessionParamsSchema } from '../middleware/validation/common-param.schemas'
 
 export function createSessionRoutes(
 	controller: SessionController
 ) {
 	const router = Router()
 
+	const sessionParam = `/:${ROUTE_SEGMENTS.SESSION_ID}`
+
 	// ============================================================
-	// GET SESSION
+	// GET /sessions/:sessionId
 	// ============================================================
 
 	router.get(
-		'/:userId/sessions/:sessionId',
+		sessionParam,
 		validate(SessionParamsSchema, 'params'),
 		controller.getById.bind(controller)
 	)
 
 	// ============================================================
-	// DELETE SESSION
+	// DELETE /sessions/:sessionId
 	// ============================================================
 
 	router.delete(
-		'/:userId/sessions/:sessionId',
+		sessionParam,
 		validate(SessionParamsSchema, 'params'),
 		controller.delete.bind(controller)
 	)

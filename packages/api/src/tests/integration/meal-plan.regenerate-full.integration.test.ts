@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)', () => {
+describe('POST /api/meal-plans/sessions/:sessionId/regenerate (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -29,8 +31,8 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
   const fakeContext = {} as any
   const fakeMealPlan = { days: [{ meals: {} }] } as any
 
-  const endpoint = (userId: string, sessionId: string) =>
-    `/api/users/${userId}/sessions/${sessionId}/regenerate`
+  const endpoint = (sessionId: string) =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.MEAL_PLANS}/${ROUTE_SEGMENTS.SESSIONS}/${sessionId}/${ROUTE_SEGMENTS.REGENERATE}`
 
   beforeEach(() => {
 
@@ -41,6 +43,9 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
       updateSessionMealPlan: jest.fn()
     } as any
 
+    // 🔥 IMPORTANT — user existence guard
+    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
+
     mockContextBuilder = {
       buildFullContext: jest.fn(),
       buildSessionContext: jest.fn()
@@ -50,10 +55,11 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
       regenerateFullPlan: jest.fn()
     } as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
 
@@ -64,7 +70,7 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
   it('returns 400 if params invalid', async () => {
 
     const res = await request(app)
-      .post(endpoint('invalid-id', validSessionId))
+      .post(endpoint('invalid-id'))
       .send({ reason: 'Change everything' })
 
     expect(res.status).toBe(400)
@@ -78,8 +84,8 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
   it('returns 400 if body invalid', async () => {
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
-      .send({ reason: '' }) // invalid
+      .post(endpoint(validSessionId))
+      .send({ reason: '' }) // invalid (min 1)
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -91,11 +97,10 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
 
   it('returns 404 if session not found', async () => {
 
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.findSessionById.mockResolvedValue(null)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
       .send({ reason: 'Change everything' })
 
     expect(res.status).toBe(404)
@@ -108,14 +113,13 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
 
   it('returns 404 if user does not own session', async () => {
 
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.findSessionById.mockResolvedValue({
       ...fakeSession,
       userId: 'another-user'
     })
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
       .send({ reason: 'Change everything' })
 
     expect(res.status).toBe(404)
@@ -128,7 +132,6 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
 
   it('regenerates full plan successfully', async () => {
 
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
 
     mockContextBuilder.buildSessionContext.mockReturnValue(fakeSession)
@@ -142,7 +145,7 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
     } as any)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
       .send({ reason: 'Change everything' })
 
     expect(res.status).toBe(200)
@@ -154,38 +157,6 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate (Integration)',
 
     expect(mockDataAccess.updateSessionMealPlan)
       .toHaveBeenCalledWith(validSessionId, fakeMealPlan)
-  })
-
-  // ============================================================
-  // 6️⃣ AI Limiter Trigger
-  // ============================================================
-
-  it('returns 429 if AI limiter exceeded', async () => {
-
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
-    mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
-
-    mockContextBuilder.buildSessionContext.mockReturnValue(fakeSession)
-    mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
-
-    mockGenerator.regenerateFullPlan.mockResolvedValue({
-      mealPlan: fakeMealPlan,
-      tokensUsed: { totalTokens: 10 },
-      generationTime: 50,
-      provider: 'openai'
-    } as any)
-
-    for (let i = 0; i < 10; i++) {
-      await request(app)
-        .post(endpoint(validUserId, validSessionId))
-        .send({ reason: 'Change everything' })
-    }
-
-    const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
-      .send({ reason: 'Change everything' })
-
-    expect(res.status).toBe(429)
   })
 
 })

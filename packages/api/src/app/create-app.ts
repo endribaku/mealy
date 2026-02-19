@@ -1,11 +1,12 @@
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
-import morgan from 'morgan'
 
-import { createUserRoutes } from '../routes/user.routes'
-import { createSessionRoutes } from '../routes/session.routes'
-import { createMealPlanRoutes } from '../routes/meal-plan.routes'
+import { correlationIdMiddleware } from '../middleware/correlation/correlation.middleware'
+import { httpLogger } from '../middleware/http-logger/http-logger.middleware'
+
+import { createApiRouter } from '../routes/routes.api'
+import { API_PREFIX } from '../routes/routes.constants'
 
 import { globalErrorHandler, notFoundHandler } from '../middleware/error/global-error.middleware'
 import { createRateLimiter } from '../middleware/rate-limiter/rate-limiter.middleware'
@@ -29,82 +30,118 @@ interface AppDependencies {
   contextBuilder: IContextBuilder
   generator: IMealPlanGenerator
   corsOrigin?: string
+  enableAuth?: boolean,
+  enableLogging?: boolean
+  testUser?: { id: string }
 }
 
 export function createApp({
   dataAccess,
   contextBuilder,
   generator,
-  corsOrigin = '*'
+  corsOrigin = '*',
+  enableAuth = false,
+  enableLogging,
+  testUser
 }: AppDependencies) {
 
-  const app = express()
+      const app = express()
 
-  // ------------------------------------------------
-  // Global Middleware (same order as before)
-  // ------------------------------------------------
+      // ----------------------------
+      // Global Middleware
+      // ----------------------------
 
-  app.use(helmet())
+      app.use(helmet())
 
-  app.use(cors({
-    origin: corsOrigin,
-    credentials: true
-  }))
+      app.use(cors({
+        origin: corsOrigin,
+        credentials: true
+      }))
 
-  app.set('trust proxy', 1)
+      app.set('trust proxy', 1)
 
-  app.use(express.json())
+      app.use(express.json())
+      
+      const shouldLog =
+        enableLogging
 
-  app.use(morgan('dev'))
+      if (shouldLog) {
+        app.use(correlationIdMiddleware)
+        app.use(httpLogger)
+      }
 
-  app.use(
-    createRateLimiter({
-      windowMs: 15 * 60 * 1000,
-      max: 100
-    })
-  )
+      app.use(
+        createRateLimiter({
+          windowMs: 15 * 60 * 1000,
+          max: 100
+        })
+      )
 
-  const aiLimiter = createRateLimiter({
-    windowMs: 60 * 1000,
-    max: 10,
-    message: 'AI generation limit exceeded'
-  })
+      const aiLimiter = createRateLimiter({
+        windowMs: 60 * 1000,
+        max: 10,
+        message: 'AI generation limit exceeded'
+      })
 
-  // ------------------------------------------------
-  // Services
-  // ------------------------------------------------
+      // ----------------------------
+      // Services
+      // ----------------------------
 
-  const mealPlanService = new MealPlanService(
-    dataAccess,
-    contextBuilder,
-    generator
-  )
+      const mealPlanService = new MealPlanService(
+        dataAccess,
+        contextBuilder,
+        generator
+      )
 
-  const userService = new UserService(dataAccess)
-  const sessionService = new SessionService(dataAccess)
+      const userService = new UserService(dataAccess)
+      const sessionService = new SessionService(dataAccess)
 
-  // ------------------------------------------------
-  // Controllers
-  // ------------------------------------------------
+      // ----------------------------
+      // Controllers
+      // ----------------------------
 
-  const mealPlanController = new MealPlanController(mealPlanService)
-  const sessionController = new SessionController(sessionService)
-  const userController = new UserController(userService)
+      const mealPlanController = new MealPlanController(mealPlanService)
+      const sessionController = new SessionController(sessionService)
+      const userController = new UserController(userService)
 
-  // ------------------------------------------------
-  // Routes
-  // ------------------------------------------------
+      // ----------------------------
+      // Authentication
+      // ----------------------------
+      let authMiddleware: any
 
-  app.use('/api/users', createUserRoutes(userController))
-  app.use('/api/users', createSessionRoutes(sessionController))
-  app.use('/api/users', createMealPlanRoutes(mealPlanController, aiLimiter))
+      if (enableAuth) {
+        authMiddleware = require('../middleware/authentication/auth.middleware').authMiddleware
+        app.use(API_PREFIX, authMiddleware)
+      }
 
-  // ------------------------------------------------
-  // Error Handling
-  // ------------------------------------------------
+      if (!enableAuth && testUser) {
+        app.use(API_PREFIX, (req, _res, next) => {
+          (req as any).user = testUser
+          next()
+        })
+      }
+      
+      // ----------------------------
+      // Centralized Router
+      // ----------------------------
 
-  app.use(notFoundHandler)
-  app.use(globalErrorHandler)
 
-  return app
+      app.use(
+        API_PREFIX,
+        createApiRouter({
+          userController,
+          sessionController,
+          mealPlanController,
+          aiLimiter
+        })
+      )
+
+      // ----------------------------
+      // Error Handling
+      // ----------------------------
+
+      app.use(notFoundHandler)
+      app.use(globalErrorHandler)
+
+      return app
 }

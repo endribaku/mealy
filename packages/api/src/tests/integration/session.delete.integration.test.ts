@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
+describe('DELETE /api/sessions/:sessionId (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -21,6 +23,9 @@ describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
     userId: validUserId
   } as any
 
+  const endpoint = (sessionId: string) =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.SESSIONS}/${sessionId}`
+
   beforeEach(() => {
 
     mockDataAccess = {
@@ -31,46 +36,36 @@ describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
 
-  // ============================================================
-  // 1️⃣ Invalid UUID
-  // ============================================================
-
-  it('returns 400 if params invalid UUID', async () => {
+  it('returns 400 if sessionId invalid UUID', async () => {
 
     const res = await request(app)
-      .delete('/api/users/not-uuid/sessions/not-uuid')
+      .delete(endpoint('not-uuid'))
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 2️⃣ Session Not Found
-  // ============================================================
 
   it('returns 404 if session does not exist', async () => {
 
     mockDataAccess.findSessionById.mockResolvedValue(null)
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .delete(endpoint(validSessionId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
 
-    expect(mockDataAccess.deleteSession).not.toHaveBeenCalled()
+    expect(mockDataAccess.deleteSession)
+      .not.toHaveBeenCalled()
   })
-
-  // ============================================================
-  // 3️⃣ Ownership Failure
-  // ============================================================
 
   it('returns 404 if session belongs to different user', async () => {
 
@@ -80,15 +75,11 @@ describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
     } as any)
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .delete(endpoint(validSessionId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 4️⃣ Unknown Error
-  // ============================================================
 
   it('returns 500 if delete throws unknown error', async () => {
 
@@ -98,15 +89,11 @@ describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
     )
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .delete(endpoint(validSessionId))
 
     expect(res.status).toBe(500)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 5️⃣ Happy Path
-  // ============================================================
 
   it('deletes session successfully', async () => {
 
@@ -114,7 +101,7 @@ describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
     mockDataAccess.deleteSession.mockResolvedValue(true)
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .delete(endpoint(validSessionId))
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -123,5 +110,4 @@ describe('DELETE /api/users/:userId/sessions/:sessionId (Integration)', () => {
     expect(mockDataAccess.deleteSession)
       .toHaveBeenCalledWith(validSessionId)
   })
-
 })

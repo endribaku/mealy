@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('GET /api/users/:userId/sessions/:sessionId (Integration)', () => {
+describe('GET /api/sessions/:sessionId (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -21,6 +23,9 @@ describe('GET /api/users/:userId/sessions/:sessionId (Integration)', () => {
     userId: validUserId
   } as any
 
+  const endpoint = (sessionId: string) =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.SESSIONS}/${sessionId}`
+
   beforeEach(() => {
 
     mockDataAccess = {
@@ -30,44 +35,33 @@ describe('GET /api/users/:userId/sessions/:sessionId (Integration)', () => {
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
 
-  // ============================================================
-  // 1️⃣ Invalid UUID
-  // ============================================================
-
-  it('returns 400 if params invalid UUID', async () => {
+  it('returns 400 if sessionId invalid UUID', async () => {
 
     const res = await request(app)
-      .get('/api/users/not-uuid/sessions/not-uuid')
+      .get(endpoint('not-uuid'))
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 2️⃣ Session Not Found
-  // ============================================================
 
   it('returns 404 if session does not exist', async () => {
 
     mockDataAccess.findSessionById.mockResolvedValue(null)
 
     const res = await request(app)
-      .get(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .get(endpoint(validSessionId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 3️⃣ Ownership Failure
-  // ============================================================
 
   it('returns 404 if session does not belong to user', async () => {
 
@@ -77,15 +71,11 @@ describe('GET /api/users/:userId/sessions/:sessionId (Integration)', () => {
     } as any)
 
     const res = await request(app)
-      .get(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .get(endpoint(validSessionId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 4️⃣ Unknown Service Error
-  // ============================================================
 
   it('returns 500 if service throws unknown error', async () => {
 
@@ -94,22 +84,18 @@ describe('GET /api/users/:userId/sessions/:sessionId (Integration)', () => {
     )
 
     const res = await request(app)
-      .get(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .get(endpoint(validSessionId))
 
     expect(res.status).toBe(500)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 5️⃣ Happy Path
-  // ============================================================
 
   it('returns session successfully', async () => {
 
     mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
 
     const res = await request(app)
-      .get(`/api/users/${validUserId}/sessions/${validSessionId}`)
+      .get(endpoint(validSessionId))
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -118,5 +104,4 @@ describe('GET /api/users/:userId/sessions/:sessionId (Integration)', () => {
     expect(mockDataAccess.findSessionById)
       .toHaveBeenCalledWith(validSessionId)
   })
-
 })

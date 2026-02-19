@@ -15,55 +15,55 @@ export class MealPlanController {
 
 	// ============================================================
 	// GENERATE NEW PLAN
-	// POST /api/users/:userId/meal-plans
+	// POST /api/meal-plans
 	// ============================================================
 
 	async generate(
-	req: Request<
-		{ userId: string },
-		BasicSuccessResponse<GenerateMealPlanResponse>,
-		{ options?: GenerationOptions }
-	>,
-	res: Response,
-	next: NextFunction
+		req: Request<
+			{},
+			BasicSuccessResponse<GenerateMealPlanResponse>,
+			{ options?: GenerationOptions }
+		>,
+		res: Response,
+		next: NextFunction
 	) {
-	try {
-		const { userId } = req.params
-		const { options } = req.body
+		try {
+			const userId = (req as any).user.id
+			const { options } = req.body
 
-		logger.info({
-		event: 'meal_plan_generate_requested',
-		userId
-		})
+			logger.info({
+				event: 'meal_plan_generate_requested',
+				userId
+			})
 
-		const result = await this.service.generateMealPlan(
-		userId,
-		options
-		)
+			const result = await this.service.generateMealPlan(
+				userId,
+				options
+			)
 
-		logger.info({
-		event: 'meal_plan_generate_success',
-		userId
-		})
+			logger.info({
+				event: 'meal_plan_generate_success',
+				userId
+			})
 
-		return res.status(201).json({
-		success: true,
-		data: result
-		})
+			return res.status(201).json({
+				success: true,
+				data: result
+			})
 
-	} catch (error) {
-		next(error)
-	}
+		} catch (error) {
+			next(error)
+		}
 	}
 
 	// ============================================================
 	// REGENERATE SINGLE MEAL
-	// POST /api/users/:userId/sessions/:sessionId/regenerate-meal
+	// POST /api/sessions/:sessionId/regenerate-meal
 	// ============================================================
 
 	async regenerateSingle(
 		req: Request<
-			{ userId: string; sessionId: string },
+			{ sessionId: string },
 			BasicSuccessResponse<{ mealPlan: MealPlan }>,
 			{
 				mealId: string
@@ -75,15 +75,15 @@ export class MealPlanController {
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, sessionId } = req.params
+			const userId = (req as any).user.id
+			const { sessionId } = req.params
 			const { mealId, reason, options } = req.body
 
 			logger.info({
-			event: 'meal_regenerate_single_requested',
-			userId,
-			sessionId,
-			mealId
+				event: 'meal_regenerate_single_requested',
+				userId,
+				sessionId,
+				mealId
 			})
 
 			const mealPlan = await this.service.regenerateSingleMeal(
@@ -95,10 +95,10 @@ export class MealPlanController {
 			)
 
 			logger.info({
-			event: 'meal_regenerate_single_success',
-			userId,
-			sessionId,
-			mealId
+				event: 'meal_regenerate_single_success',
+				userId,
+				sessionId,
+				mealId
 			})
 
 			return res.json({
@@ -113,12 +113,12 @@ export class MealPlanController {
 
 	// ============================================================
 	// REGENERATE FULL PLAN
-	// POST /api/users/:userId/sessions/:sessionId/regenerate
+	// POST /api/sessions/:sessionId/regenerate
 	// ============================================================
 
 	async regenerateFull(
 		req: Request<
-			{ userId: string; sessionId: string },
+			{ sessionId: string },
 			BasicSuccessResponse<{ mealPlan: MealPlan }>,
 			{
 				reason: string
@@ -129,8 +129,8 @@ export class MealPlanController {
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, sessionId } = req.params
+			const userId = (req as any).user.id
+			const { sessionId } = req.params
 			const { reason, options } = req.body
 			
 			logger.info({
@@ -165,20 +165,20 @@ export class MealPlanController {
 
 	// ============================================================
 	// CONFIRM PLAN
-	// POST /api/users/:userId/sessions/:sessionId/confirm
+	// POST /api/sessions/:sessionId/confirm
 	// ============================================================
 
 	async confirm(
 		req: Request<
-			{ userId: string; sessionId: string },
+			{ sessionId: string },
 			BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>
 		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, sessionId } = req.params
+			const userId = (req as any).user.id
+			const { sessionId } = req.params
 
 			logger.info({
 				event: 'meal_plan_confirm_requested',
@@ -209,20 +209,19 @@ export class MealPlanController {
 
 	// ============================================================
 	// GET MEAL PLAN HISTORY
-	// GET /api/users/:userId/meal-plans
+	// GET /api/meal-plans
 	// ============================================================
 
 	async getAll(
 		req: Request<
-			{ userId: string },
+			{},
 			BasicSuccessResponse<StoredMealPlan[]>
 		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-
-			const { userId } = req.params
+			const userId = (req as any).user.id
 
 			const plans = await this.service.getMealPlanHistory(userId)
 
@@ -238,20 +237,20 @@ export class MealPlanController {
 
 	// ============================================================
 	// GET SINGLE MEAL PLAN
-	// GET /api/users/:userId/meal-plans/:planId
+	// GET /api/meal-plans/:planId
 	// ============================================================
 
 	async getById(
 		req: Request<
-			{ userId: string; planId: string },
+			{ planId: string },
 			BasicSuccessResponse<StoredMealPlan>
 		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, planId } = req.params
+			const userId = (req as any).user.id
+			const { planId } = req.params
 
 			const plan = await this.service.getMealPlanById(
 				userId,
@@ -270,20 +269,20 @@ export class MealPlanController {
 
 	// ============================================================
 	// DELETE MEAL PLAN
-	// DELETE /api/users/:userId/meal-plans/:planId
+	// DELETE /api/meal-plans/:planId
 	// ============================================================
 
 	async delete(
 		req: Request<
-			{ userId: string; planId: string },
+			{ planId: string },
 			BasicSuccessResponse<{ deleted: true }>
 		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, planId } = req.params
+			const userId = (req as any).user.id
+			const { planId } = req.params
 
 			logger.info({
 				event: 'meal_plan_delete_requested',

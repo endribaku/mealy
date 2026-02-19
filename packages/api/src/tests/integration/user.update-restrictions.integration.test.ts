@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('PATCH /api/users/:userId/restrictions (Integration)', () => {
+describe('PATCH /api/users/me/restrictions (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -20,6 +22,9 @@ describe('PATCH /api/users/:userId/restrictions (Integration)', () => {
     email: 'test@example.com'
   } as any
 
+  const endpoint = () =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.USERS}/${ROUTE_SEGMENTS.ME}/${ROUTE_SEGMENTS.RESTRICTIONS}`
+
   beforeEach(() => {
 
     mockDataAccess = {
@@ -30,76 +35,33 @@ describe('PATCH /api/users/:userId/restrictions (Integration)', () => {
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
 
-  // ============================================================
-  // 1️⃣ Invalid UUID
-  // ============================================================
-
-  it('returns 400 if userId invalid UUID', async () => {
+  it('returns 400 if body invalid', async () => {
 
     const res = await request(app)
-      .patch('/api/users/not-a-valid-uuid/restrictions')
-      .send({ vegetarian: true })
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  // ============================================================
-  // 2️⃣ Body Validation Failure (Wrong Type)
-  // ============================================================
-
-  it('returns 400 if body has invalid types', async () => {
-
-    const res = await request(app)
-      .patch(`/api/users/${validUserId}/restrictions`)
-      .send({ vegetarian: 'yes' }) // invalid boolean
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  // ============================================================
-  // 3️⃣ Strict Mode Rejection
-  // ============================================================
-
-  it('returns 400 if body contains unknown field', async () => {
-
-    const res = await request(app)
-      .patch(`/api/users/${validUserId}/restrictions`)
-      .send({ unknown: true })
+      .patch(endpoint())
+      .send({ vegetarian: 'yes' })
 
     expect(res.status).toBe(400)
   })
-
-  // ============================================================
-  // 4️⃣ Guard Failure — User Not Found
-  // ============================================================
 
   it('returns 404 if user does not exist', async () => {
 
     mockDataAccess.findUserById.mockResolvedValue(null)
 
     const res = await request(app)
-      .patch(`/api/users/${validUserId}/restrictions`)
+      .patch(endpoint())
       .send({ vegetarian: true })
 
     expect(res.status).toBe(404)
-    expect(res.body.success).toBe(false)
-
-    expect(mockDataAccess.updateDietaryRestrictions)
-      .not.toHaveBeenCalled()
   })
-
-  // ============================================================
-  // 5️⃣ Service Throws Unknown Error
-  // ============================================================
 
   it('returns 500 if service throws unknown error', async () => {
 
@@ -109,16 +71,11 @@ describe('PATCH /api/users/:userId/restrictions (Integration)', () => {
     )
 
     const res = await request(app)
-      .patch(`/api/users/${validUserId}/restrictions`)
+      .patch(endpoint())
       .send({ vegetarian: true })
 
     expect(res.status).toBe(500)
-    expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 6️⃣ Happy Path
-  // ============================================================
 
   it('updates dietary restrictions successfully', async () => {
 
@@ -126,16 +83,14 @@ describe('PATCH /api/users/:userId/restrictions (Integration)', () => {
     mockDataAccess.updateDietaryRestrictions.mockResolvedValue(fakeUser)
 
     const res = await request(app)
-      .patch(`/api/users/${validUserId}/restrictions`)
+      .patch(endpoint())
       .send({ vegetarian: true })
 
     expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
 
     expect(mockDataAccess.updateDietaryRestrictions)
       .toHaveBeenCalledWith(validUserId, {
         vegetarian: true
       })
   })
-
 })

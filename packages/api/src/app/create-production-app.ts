@@ -12,6 +12,8 @@ export function createProductionApp() {
     dataAccess,
     contextBuilder,
     generator,
-    corsOrigin: process.env.CORS_ORIGIN
+    corsOrigin: process.env.CORS_ORIGIN,
+    enableAuth: true,
+    enableLogging: true
   })
 }

@@ -9,16 +9,14 @@ export const UserIdParamsSchema = z.object({
 })
 
 export const SessionParamsSchema = z.object({
-	userId: z.uuid(),
 	sessionId: z.uuid()
 })
 
 export const PlanParamsSchema = z.object({
-	userId: z.uuid(),
 	planId: z.uuid()
 })
 
-// ============================================================
+// ===================a=========================================
 // EMPTY BODY
 // ============================================================
 

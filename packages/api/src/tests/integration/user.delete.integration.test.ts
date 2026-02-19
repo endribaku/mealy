@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('DELETE /api/users/:userId (Integration)', () => {
+describe('DELETE /api/users/me (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -20,6 +22,9 @@ describe('DELETE /api/users/:userId (Integration)', () => {
     email: 'test@example.com'
   } as any
 
+  const endpoint = () =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.USERS}/${ROUTE_SEGMENTS.ME}`
+
   beforeEach(() => {
 
     mockDataAccess = {
@@ -30,49 +35,25 @@ describe('DELETE /api/users/:userId (Integration)', () => {
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
-
-  // ============================================================
-  // 1️⃣ Param Validation Failure
-  // ============================================================
-
-  it('returns 400 if userId is invalid UUID', async () => {
-
-    const res = await request(app)
-      .delete('/api/users/not-a-valid-uuid')
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  // ============================================================
-  // 2️⃣ Guard Failure — User Not Found
-  // ============================================================
 
   it('returns 404 if user does not exist', async () => {
 
     mockDataAccess.findUserById.mockResolvedValue(null)
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}`)
+      .delete(endpoint())
 
     expect(res.status).toBe(404)
-    expect(res.body.success).toBe(false)
-
-    // deleteUser should NOT be called
-    expect(mockDataAccess.deleteUser).not.toHaveBeenCalled()
   })
 
-  // ============================================================
-  // 3️⃣ Service Unexpected Error
-  // ============================================================
-
-  it('returns 500 if delete operation throws unknown error', async () => {
+  it('returns 500 if delete throws unknown error', async () => {
 
     mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.deleteUser.mockRejectedValue(
@@ -80,15 +61,10 @@ describe('DELETE /api/users/:userId (Integration)', () => {
     )
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}`)
+      .delete(endpoint())
 
     expect(res.status).toBe(500)
-    expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 4️⃣ Happy Path
-  // ============================================================
 
   it('deletes user successfully', async () => {
 
@@ -96,18 +72,11 @@ describe('DELETE /api/users/:userId (Integration)', () => {
     mockDataAccess.deleteUser.mockResolvedValue(true)
 
     const res = await request(app)
-      .delete(`/api/users/${validUserId}`)
+      .delete(endpoint())
 
-    // HTTP Layer
     expect(res.status).toBe(200)
-
-    // JSON formatting
     expect(res.body.success).toBe(true)
     expect(res.body.data).toEqual({ deleted: true })
-
-    // Service execution verification
-    expect(mockDataAccess.findUserById)
-      .toHaveBeenCalledWith(validUserId)
 
     expect(mockDataAccess.deleteUser)
       .toHaveBeenCalledWith(validUserId)

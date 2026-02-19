@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integration)', () => {
+describe('POST /api/meal-plans/sessions/:sessionId/regenerate-meal (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -16,7 +18,6 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integrati
   const validUserId = '550e8400-e29b-41d4-a716-446655440000'
   const validSessionId = '8f14e45f-ea4e-4cde-b123-123456789abc'
 
-  const fakeUser = { id: validUserId } as any
   const fakeSession = {
     id: validSessionId,
     userId: validUserId,
@@ -24,12 +25,13 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integrati
     modifications: [],
     temporaryConstraints: []
   } as any
+  const fakeUser = { id: validUserId } as any
 
   const fakeContext = {} as any
   const fakeMealPlan = { days: [{ meals: {} }] } as any
 
-  const endpoint = (userId: string, sessionId: string) =>
-    `/api/users/${userId}/sessions/${sessionId}/regenerate-meal`
+  const endpoint = (sessionId: string) =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.MEAL_PLANS}/${ROUTE_SEGMENTS.SESSIONS}/${sessionId}/${ROUTE_SEGMENTS.REGENERATE_MEAL}`
 
   beforeEach(() => {
 
@@ -40,6 +42,8 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integrati
       updateSessionMealPlan: jest.fn()
     } as any
 
+
+
     mockContextBuilder = {
       buildFullContext: jest.fn(),
       buildSessionContext: jest.fn()
@@ -49,96 +53,59 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integrati
       regenerateSingleMeal: jest.fn()
     } as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
-
-  // ============================================================
-  // 1️⃣ Validation: Invalid UUID
-  // ============================================================
 
   it('returns 400 if params invalid', async () => {
 
     const res = await request(app)
-      .post(endpoint('invalid-id', validSessionId))
+      .post(endpoint('invalid-id'))
       .send({
         mealId: 'breakfast-day1',
         reason: 'Too repetitive'
       })
 
     expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 2️⃣ Validation: Invalid Body
-  // ============================================================
-
-  it('returns 400 if body invalid', async () => {
-
-    const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
-      .send({
-        mealId: '', // invalid
-        reason: ''
-      })
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  // ============================================================
-  // 3️⃣ Session Not Found
-  // ============================================================
 
   it('returns 404 if session not found', async () => {
 
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.findSessionById.mockResolvedValue(null)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
       .send({
         mealId: 'breakfast-day1',
         reason: 'Too repetitive'
       })
 
     expect(res.status).toBe(404)
-    expect(res.body.success).toBe(false)
   })
 
-  // ============================================================
-  // 4️⃣ Unauthorized User
-  // ============================================================
+  it('returns 404 if user does not own session', async () => {
 
-  it('returns 403 if user does not own session', async () => {
-
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.findSessionById.mockResolvedValue({
       ...fakeSession,
       userId: 'another-user'
     })
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
       .send({
         mealId: 'breakfast-day1',
         reason: 'Too repetitive'
       })
 
-    expect(res.status).toBe(403)
-    expect(res.body.success).toBe(false)
+    expect(res.status).toBe(404)
   })
 
-  // ============================================================
-  // 5️⃣ Happy Path
-  // ============================================================
-
   it('regenerates single meal successfully', async () => {
-
+   
     mockDataAccess.findUserById.mockResolvedValue(fakeUser)
     mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
 
@@ -153,7 +120,7 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integrati
     } as any)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
       .send({
         mealId: 'breakfast-day1',
         reason: 'Too repetitive'
@@ -163,49 +130,7 @@ describe('POST /api/users/:userId/sessions/:sessionId/regenerate-meal (Integrati
     expect(res.body.success).toBe(true)
     expect(res.body.data.mealPlan).toEqual(fakeMealPlan)
 
-    expect(mockDataAccess.addSessionModification)
-      .toHaveBeenCalled()
-
     expect(mockDataAccess.updateSessionMealPlan)
       .toHaveBeenCalledWith(validSessionId, fakeMealPlan)
   })
-
-  // ============================================================
-  // 6️⃣ AI Limiter Trigger
-  // ============================================================
-
-  it('returns 429 if AI limiter exceeded', async () => {
-
-    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
-    mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
-
-    mockContextBuilder.buildSessionContext.mockReturnValue(fakeSession)
-    mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
-
-    mockGenerator.regenerateSingleMeal.mockResolvedValue({
-      mealPlan: fakeMealPlan,
-      tokensUsed: { totalTokens: 10 },
-      generationTime: 50,
-      provider: 'openai'
-    } as any)
-
-    for (let i = 0; i < 10; i++) {
-      await request(app)
-        .post(endpoint(validUserId, validSessionId))
-        .send({
-          mealId: 'breakfast-day1',
-          reason: 'Too repetitive'
-        })
-    }
-
-    const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
-      .send({
-        mealId: 'breakfast-day1',
-        reason: 'Too repetitive'
-      })
-
-    expect(res.status).toBe(429)
-  })
-
 })

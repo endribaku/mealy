@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { SessionService } from '../services/session.service'
 import { BasicSuccessResponse } from '../types/dto.types'
-import { logger } from '../misc/logger';
+import { logger } from '../misc/logger'
 
 export class SessionController {
 
@@ -11,12 +11,12 @@ export class SessionController {
 
 	// ============================================================
 	// GET SESSION BY ID
-	// GET /api/users/:userId/sessions/:sessionId
+	// GET /api/sessions/:sessionId
 	// ============================================================
 
 	async getById(
 		req: Request<
-			{ userId: string; sessionId: string },
+			{ sessionId: string },
 			BasicSuccessResponse<
 				Awaited<ReturnType<SessionService['getById']>>
 			>
@@ -25,8 +25,8 @@ export class SessionController {
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, sessionId } = req.params
+			const userId = (req as any).user.id
+			const { sessionId } = req.params
 
 			const session = await this.service.getById(
 				userId,
@@ -45,20 +45,20 @@ export class SessionController {
 
 	// ============================================================
 	// DELETE SESSION
-	// DELETE /api/users/:userId/sessions/:sessionId
+	// DELETE /api/sessions/:sessionId
 	// ============================================================
 
 	async delete(
 		req: Request<
-			{ userId: string; sessionId: string },
+			{ sessionId: string },
 			BasicSuccessResponse<{ deleted: true }>
 		>,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-
-			const { userId, sessionId } = req.params
+			const userId = (req as any).user.id
+			const { sessionId } = req.params
 
 			logger.info({
 				event: 'session_delete_requested',

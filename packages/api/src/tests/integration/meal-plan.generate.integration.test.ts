@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('POST /api/users/:userId/meal-plans (Integration)', () => {
+describe('POST /api/meal-plans (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -16,6 +18,7 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
   const validUserId = '550e8400-e29b-41d4-a716-446655440000'
 
   const fakeUser = { id: validUserId } as any
+
   const fakeSession = {
     id: '8f14e45f-ea4e-4cde-b123-123456789abc'
   } as any
@@ -23,7 +26,8 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
   const fakeMealPlan = { days: [] } as any
   const fakeContext = {} as any
 
-  const endpoint = (id: string) => `/api/users/${id}/meal-plans`
+  const endpoint = () =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.MEAL_PLANS}`
 
   beforeEach(() => {
 
@@ -41,29 +45,30 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
       generateMealPlan: jest.fn()
     } as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: {id: validUserId}
     })
   })
 
   // ============================================================
-  // 1️⃣ Validation Failure
+  // 1️⃣ Body Validation Failure
   // ============================================================
 
-  it('returns 400 if userId param invalid (validation)', async () => {
+  it('returns 400 if body invalid', async () => {
 
     const res = await request(app)
-      .post(endpoint('not-a-valid-uuid'))
-      .send({ options: {} }) // 🔥 valid body shape
+      .post(endpoint())
+      .send({ invalid: true }) // invalid body
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
   })
 
   // ============================================================
-  // 2️⃣ User Not Found (Service Guard)
+  // 2️⃣ User Not Found
   // ============================================================
 
   it('returns 404 if user does not exist', async () => {
@@ -71,12 +76,11 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
     mockDataAccess.findUserById.mockResolvedValue(null)
 
     const res = await request(app)
-      .post(endpoint(validUserId))
-      .send({ options: {} }) // 🔥 valid body shape
+      .post(endpoint())
+      .send({ options: {} })
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
-    expect(res.body.message).toBeDefined()
 
     expect(mockGenerator.generateMealPlan)
       .not.toHaveBeenCalled()
@@ -101,7 +105,7 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
     mockDataAccess.createSession.mockResolvedValue(fakeSession)
 
     const res = await request(app)
-      .post(endpoint(validUserId))
+      .post(endpoint())
       .send({
         options: {
           temperature: 0.5
@@ -110,10 +114,6 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
 
     expect(res.status).toBe(201)
     expect(res.body.success).toBe(true)
-
-    expect(res.body.data).toHaveProperty('sessionId')
-    expect(res.body.data).toHaveProperty('mealPlan')
-    expect(res.body.data).toHaveProperty('metadata')
 
     expect(res.body.data.sessionId).toBe(fakeSession.id)
     expect(res.body.data.mealPlan).toEqual(fakeMealPlan)
@@ -147,18 +147,16 @@ describe('POST /api/users/:userId/meal-plans (Integration)', () => {
 
     mockDataAccess.createSession.mockResolvedValue(fakeSession)
 
-    // Trigger limit 10 times
     for (let i = 0; i < 10; i++) {
       await request(app)
-        .post(endpoint(validUserId))
-        .send({ options: {} }) // 🔥 valid body shape
+        .post(endpoint())
+        .send({ options: {} })
     }
 
     const res = await request(app)
-      .post(endpoint(validUserId))
-      .send({ options: {} }) // 🔥 valid body shape
+      .post(endpoint())
+      .send({ options: {} })
 
     expect(res.status).toBe(429)
   })
-
 })

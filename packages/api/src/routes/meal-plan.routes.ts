@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { MealPlanController } from '../controllers/meal-plan.controller'
-import { RateLimitRequestHandler } from 'express-rate-limit'
+import type { RateLimitRequestHandler } from 'express-rate-limit'
 import { validate } from '../middleware/validation/validate'
 
+import { ROUTE_SEGMENTS } from './routes.constants'
+
 import {
-	UserIdParamsSchema,
 	SessionParamsSchema,
 	PlanParamsSchema
 } from '../middleware/validation/common-param.schemas'
@@ -21,36 +22,63 @@ export function createMealPlanRoutes(
 ) {
 	const router = Router()
 
+	// =========================
+	// CONSTANT PARAM SEGMENTS
+	// =========================
+
+	const sessionParam = `/:${ROUTE_SEGMENTS.SESSION_ID}`
+	const planParam = `/:${ROUTE_SEGMENTS.PLAN_ID}`
+
+	const regenerate = `/${ROUTE_SEGMENTS.REGENERATE}`
+	const regenerateMeal = `/${ROUTE_SEGMENTS.REGENERATE_MEAL}`
+	const confirm = `/${ROUTE_SEGMENTS.CONFIRM}`
+
 	// ============================================================
-	// GENERATE NEW PLAN
+	// POST /meal-plans
 	// ============================================================
 
 	router.post(
-		'/:userId/meal-plans',
+		'/',
 		aiLimiter,
-		validate(UserIdParamsSchema, 'params'),
 		validate(GenerateMealPlanBodySchema, 'body'),
 		controller.generate.bind(controller)
 	)
 
 	// ============================================================
-	// REGENERATE SINGLE MEAL
+	// GET /meal-plans
 	// ============================================================
 
-	router.post(
-		'/:userId/sessions/:sessionId/regenerate-meal',
-		aiLimiter,
-		validate(SessionParamsSchema, 'params'),
-		validate(RegenerateSingleBodySchema, 'body'),
-		controller.regenerateSingle.bind(controller)
+	router.get(
+		'/',
+		controller.getAll.bind(controller)
 	)
 
 	// ============================================================
-	// REGENERATE FULL PLAN
+	// GET /meal-plans/:planId
+	// ============================================================
+
+	router.get(
+		planParam,
+		validate(PlanParamsSchema, 'params'),
+		controller.getById.bind(controller)
+	)
+
+	// ============================================================
+	// DELETE /meal-plans/:planId
+	// ============================================================
+
+	router.delete(
+		planParam,
+		validate(PlanParamsSchema, 'params'),
+		controller.delete.bind(controller)
+	)
+
+	// ============================================================
+	// POST /sessions/:sessionId/regenerate
 	// ============================================================
 
 	router.post(
-		'/:userId/sessions/:sessionId/regenerate',
+		`/${ROUTE_SEGMENTS.SESSIONS}${sessionParam}${regenerate}`,
 		aiLimiter,
 		validate(SessionParamsSchema, 'params'),
 		validate(RegenerateFullBodySchema, 'body'),
@@ -58,43 +86,25 @@ export function createMealPlanRoutes(
 	)
 
 	// ============================================================
-	// CONFIRM PLAN
+	// POST /sessions/:sessionId/regenerate-meal
 	// ============================================================
 
 	router.post(
-		'/:userId/sessions/:sessionId/confirm',
+		`/${ROUTE_SEGMENTS.SESSIONS}${sessionParam}${regenerateMeal}`,
+		aiLimiter,
+		validate(SessionParamsSchema, 'params'),
+		validate(RegenerateSingleBodySchema, 'body'),
+		controller.regenerateSingle.bind(controller)
+	)
+
+	// ============================================================
+	// POST /sessions/:sessionId/confirm
+	// ============================================================
+
+	router.post(
+		`/${ROUTE_SEGMENTS.SESSIONS}${sessionParam}${confirm}`,
 		validate(SessionParamsSchema, 'params'),
 		controller.confirm.bind(controller)
-	)
-
-	// ============================================================
-	// GET HISTORY
-	// ============================================================
-
-	router.get(
-		'/:userId/meal-plans',
-		validate(UserIdParamsSchema, 'params'),
-		controller.getAll.bind(controller)
-	)
-
-	// ============================================================
-	// GET SINGLE PLAN
-	// ============================================================
-
-	router.get(
-		'/:userId/meal-plans/:planId',
-		validate(PlanParamsSchema, 'params'),
-		controller.getById.bind(controller)
-	)
-
-	// ============================================================
-	// DELETE PLAN
-	// ============================================================
-
-	router.delete(
-		'/:userId/meal-plans/:planId',
-		validate(PlanParamsSchema, 'params'),
-		controller.delete.bind(controller)
 	)
 
 	return router

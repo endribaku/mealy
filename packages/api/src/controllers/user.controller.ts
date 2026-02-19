@@ -9,16 +9,17 @@ export class UserController {
 	) {}
 
 	// ============================================================
-	// GET USER BY ID
+	// GET CURRENT USER
+	// GET /api/users/me
 	// ============================================================
 
 	async getById(
-		req: Request<{ userId: string }>,
+		req: Request,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId } = req.params
+			const userId = (req as any).user.id
 
 			const user = await this.service.getById(userId)
 
@@ -32,7 +33,8 @@ export class UserController {
 	}
 
 	// ============================================================
-	// CREATE USER
+	// CREATE USER (public)
+	// POST /api/users
 	// ============================================================
 
 	async create(
@@ -53,7 +55,6 @@ export class UserController {
 				userId: user.id
 			})
 
-
 			return res.status(201).json({
 				success: true,
 				data: user
@@ -65,15 +66,16 @@ export class UserController {
 
 	// ============================================================
 	// UPDATE PROFILE
+	// PATCH /api/users/me/profile
 	// ============================================================
 
 	async updateProfile(
-		req: Request<{ userId: string }>,
+		req: Request,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId } = req.params
+			const userId = (req as any).user.id
 
 			logger.info({
 				event: 'user_update_profile_requested',
@@ -90,7 +92,6 @@ export class UserController {
 				userId
 			})
 
-
 			return res.json({
 				success: true,
 				data: updatedUser
@@ -102,15 +103,16 @@ export class UserController {
 
 	// ============================================================
 	// UPDATE LEARNED PREFERENCES
+	// PATCH /api/users/me/preferences
 	// ============================================================
 
 	async updatePreferences(
-		req: Request<{ userId: string }>,
+		req: Request,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId } = req.params
+			const userId = (req as any).user.id
 
 			logger.info({
 				event: 'user_update_preferences_requested',
@@ -127,7 +129,6 @@ export class UserController {
 				userId
 			})
 
-
 			return res.json({
 				success: true,
 				data: updatedUser
@@ -139,15 +140,16 @@ export class UserController {
 
 	// ============================================================
 	// UPDATE DIETARY RESTRICTIONS
+	// PATCH /api/users/me/restrictions
 	// ============================================================
 
 	async updateRestrictions(
-		req: Request<{ userId: string }>,
+		req: Request,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId } = req.params
+			const userId = (req as any).user.id
 
 			logger.info({
 				event: 'user_update_restrictions_requested',
@@ -174,16 +176,17 @@ export class UserController {
 	}
 
 	// ============================================================
-	// DELETE USER
+	// DELETE CURRENT USER
+	// DELETE /api/users/me
 	// ============================================================
 
 	async delete(
-		req: Request<{ userId: string }>,
+		req: Request,
 		res: Response,
 		next: NextFunction
 	) {
 		try {
-			const { userId } = req.params
+			const userId = (req as any).user.id
 
 			logger.warn({
 				event: 'user_delete_requested',

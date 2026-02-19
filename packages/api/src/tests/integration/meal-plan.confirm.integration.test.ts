@@ -1,12 +1,14 @@
 import request from 'supertest'
-import { createApp } from '../../../src/app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('POST /api/users/:userId/sessions/:sessionId/confirm (Integration)', () => {
+describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -35,12 +37,13 @@ describe('POST /api/users/:userId/sessions/:sessionId/confirm (Integration)', ()
     days: []
   } as any
 
-  const endpoint = (userId: string, sessionId: string) =>
-    `/api/users/${userId}/sessions/${sessionId}/confirm`
+  const endpoint = (sessionId: string) =>
+  `${API_PREFIX}/${ROUTE_SEGMENTS.MEAL_PLANS}/${ROUTE_SEGMENTS.SESSIONS}/${sessionId}/${ROUTE_SEGMENTS.CONFIRM}`
 
   beforeEach(() => {
 
     mockDataAccess = {
+      findUserById: jest.fn(),
       findSessionById: jest.fn(),
       saveMealPlan: jest.fn()
     } as any
@@ -48,44 +51,33 @@ describe('POST /api/users/:userId/sessions/:sessionId/confirm (Integration)', ()
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: {id: validUserId}
     })
   })
-
-  // ============================================================
-  // 1️⃣ Validation: Invalid UUID
-  // ============================================================
 
   it('returns 400 if params invalid', async () => {
 
     const res = await request(app)
-      .post(endpoint('invalid-id', validSessionId))
+      .post(endpoint('invalid-id'))
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 2️⃣ Session Not Found
-  // ============================================================
 
   it('returns 404 if session not found', async () => {
 
     mockDataAccess.findSessionById.mockResolvedValue(null)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 3️⃣ Unauthorized User (Ownership Guard)
-  // ============================================================
 
   it('returns 404 if user does not own session', async () => {
 
@@ -95,31 +87,22 @@ describe('POST /api/users/:userId/sessions/:sessionId/confirm (Integration)', ()
     })
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 4️⃣ No Current Meal Plan
-  // ============================================================
 
   it('returns 400 if no meal plan to confirm', async () => {
 
     mockDataAccess.findSessionById.mockResolvedValue(fakeSessionWithoutPlan)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
-    expect(res.body.message).toBeDefined()
   })
-
-  // ============================================================
-  // 5️⃣ Happy Path
-  // ============================================================
 
   it('confirms meal plan successfully', async () => {
 
@@ -127,14 +110,16 @@ describe('POST /api/users/:userId/sessions/:sessionId/confirm (Integration)', ()
     mockDataAccess.saveMealPlan.mockResolvedValue(savedPlan)
 
     const res = await request(app)
-      .post(endpoint(validUserId, validSessionId))
+      .post(endpoint(validSessionId))
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.data.mealPlan).toEqual(savedPlan)
 
     expect(mockDataAccess.saveMealPlan)
-      .toHaveBeenCalledWith(validUserId, fakeSessionWithPlan.currentMealPlan)
+      .toHaveBeenCalledWith(
+        validUserId,
+        fakeSessionWithPlan.currentMealPlan
+      )
   })
-
 })

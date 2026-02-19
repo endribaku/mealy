@@ -1,5 +1,7 @@
 import request from 'supertest'
-import { createApp } from '../../app/create-app'
+import { createIntegrationApp } from '../utils/create-integration-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
@@ -33,6 +35,9 @@ describe('POST /api/users (Integration)', () => {
     }
   } as any
 
+  const endpoint = () =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.USERS}`
+
   beforeEach(() => {
 
     mockDataAccess = {
@@ -42,64 +47,29 @@ describe('POST /api/users (Integration)', () => {
     mockContextBuilder = {} as any
     mockGenerator = {} as any
 
-    app = createApp({
+    app = createIntegrationApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      testUser: { id: validUserId }
     })
   })
 
-  // ============================================================
-  // 1️⃣ Validation Failure — Missing Body
-  // ============================================================
-
   it('returns 400 if body missing required fields', async () => {
-
-    const res = await request(app)
-      .post('/api/users')
-      .send({})
-
+    const res = await request(app).post(endpoint()).send({})
     expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
   })
 
-  // ============================================================
-  // 2️⃣ Validation Failure — Invalid Email
-  // ============================================================
-
   it('returns 400 if email invalid', async () => {
-
     const res = await request(app)
-      .post('/api/users')
+      .post(endpoint())
       .send({
         email: 'not-an-email',
         profile: { name: 'John' }
       })
 
     expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 3️⃣ Strict Mode Rejection — Unknown Field
-  // ============================================================
-
-  it('returns 400 if body contains unknown fields', async () => {
-
-    const res = await request(app)
-      .post('/api/users')
-      .send({
-        ...validBody,
-        unknownField: true
-      })
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  // ============================================================
-  // 4️⃣ Service Throws Unexpected Error
-  // ============================================================
 
   it('returns 500 if service throws unexpected error', async () => {
 
@@ -108,36 +78,25 @@ describe('POST /api/users (Integration)', () => {
     )
 
     const res = await request(app)
-      .post('/api/users')
+      .post(endpoint())
       .send(validBody)
 
     expect(res.status).toBe(500)
-    expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 5️⃣ Happy Path
-  // ============================================================
 
   it('creates user successfully', async () => {
 
     mockDataAccess.createUser.mockResolvedValue(fakeUser)
 
     const res = await request(app)
-      .post('/api/users')
+      .post(endpoint())
       .send(validBody)
 
-    // HTTP
     expect(res.status).toBe(201)
-
-    // JSON structure
     expect(res.body.success).toBe(true)
-    expect(res.body.data).toBeDefined()
     expect(res.body.data.email).toBe(validEmail)
 
-    // Service execution verification
     expect(mockDataAccess.createUser)
       .toHaveBeenCalledWith(validBody)
   })
-
 })

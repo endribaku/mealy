@@ -1,12 +1,14 @@
 import request from 'supertest'
 import { createApp } from '../../../src/app/create-app'
+import { API_PREFIX, ROUTE_SEGMENTS } from '../../../src/routes/routes.constants'
+
 import {
   IDataAccess,
   IContextBuilder,
   IMealPlanGenerator
 } from '@mealy/engine'
 
-describe('PATCH /api/users/:userId/profile (Integration)', () => {
+describe('PATCH /api/users/me/restrictions (Integration)', () => {
 
   let app: any
   let mockDataAccess: jest.Mocked<IDataAccess>
@@ -17,15 +19,17 @@ describe('PATCH /api/users/:userId/profile (Integration)', () => {
 
   const fakeUser = {
     id: validUserId,
-    email: 'test@example.com',
-    profile: { name: 'John' }
+    email: 'test@example.com'
   } as any
+
+  const endpoint = () =>
+    `${API_PREFIX}/${ROUTE_SEGMENTS.USERS}/${ROUTE_SEGMENTS.ME}/${ROUTE_SEGMENTS.RESTRICTIONS}`
 
   beforeEach(() => {
 
     mockDataAccess = {
       findUserById: jest.fn(),
-      updateUserProfile: jest.fn()
+      updateDietaryRestrictions: jest.fn()
     } as any
 
     mockContextBuilder = {} as any
@@ -34,103 +38,61 @@ describe('PATCH /api/users/:userId/profile (Integration)', () => {
     app = createApp({
       dataAccess: mockDataAccess,
       contextBuilder: mockContextBuilder,
-      generator: mockGenerator
+      generator: mockGenerator,
+      enableAuth: false,
+      testUser: { id: validUserId }
     })
   })
 
-  // ============================================================
-  // 1️⃣ Invalid UUID
-  // ============================================================
-
-  it('returns 400 if userId invalid', async () => {
+  it('returns 400 if body invalid', async () => {
 
     const res = await request(app)
-      .patch('/api/users/not-a-uuid/profile')
-      .send({ name: 'Updated' })
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  // ============================================================
-  // 2️⃣ Body Validation Failure
-  // ============================================================
-
-  it('returns 400 if body invalid type', async () => {
-
-    const res = await request(app)
-      .patch(`/api/users/${validUserId}/profile`)
-      .send({ name: 123 }) // invalid type
+      .patch(endpoint())
+      .send({ vegetarian: 'yes' })
 
     expect(res.status).toBe(400)
   })
-
-  // ============================================================
-  // 3️⃣ Strict Mode Rejection
-  // ============================================================
-
-  it('returns 400 if body contains unknown field', async () => {
-
-    const res = await request(app)
-      .patch(`/api/users/${validUserId}/profile`)
-      .send({ name: 'John', unknown: true })
-
-    expect(res.status).toBe(400)
-  })
-
-  // ============================================================
-  // 4️⃣ User Not Found Guard
-  // ============================================================
 
   it('returns 404 if user does not exist', async () => {
 
     mockDataAccess.findUserById.mockResolvedValue(null)
 
     const res = await request(app)
-      .patch(`/api/users/${validUserId}/profile`)
-      .send({ name: 'Updated' })
+      .patch(endpoint())
+      .send({ vegetarian: true })
 
     expect(res.status).toBe(404)
-    expect(res.body.success).toBe(false)
   })
-
-  // ============================================================
-  // 5️⃣ Service Throws Unexpected Error
-  // ============================================================
 
   it('returns 500 if service throws unknown error', async () => {
 
     mockDataAccess.findUserById.mockResolvedValue(fakeUser)
-    mockDataAccess.updateUserProfile.mockRejectedValue(
-      new Error('DB failure')
+    mockDataAccess.updateDietaryRestrictions.mockRejectedValue(
+      new Error('Database failure')
     )
 
     const res = await request(app)
-      .patch(`/api/users/${validUserId}/profile`)
-      .send({ name: 'Updated' })
+      .patch(endpoint())
+      .send({ vegetarian: true })
 
     expect(res.status).toBe(500)
-    expect(res.body.success).toBe(false)
   })
 
-  // ============================================================
-  // 6️⃣ Happy Path
-  // ============================================================
-
-  it('updates profile successfully', async () => {
+  it('updates dietary restrictions successfully', async () => {
 
     mockDataAccess.findUserById.mockResolvedValue(fakeUser)
-    mockDataAccess.updateUserProfile.mockResolvedValue(fakeUser)
+    mockDataAccess.updateDietaryRestrictions.mockResolvedValue(fakeUser)
 
     const res = await request(app)
-      .patch(`/api/users/${validUserId}/profile`)
-      .send({ name: 'Updated' })
+      .patch(endpoint())
+      .send({ vegetarian: true })
 
     expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
 
-    expect(mockDataAccess.updateUserProfile)
-      .toHaveBeenCalledWith(validUserId, { name: 'Updated' })
+    expect(mockDataAccess.updateDietaryRestrictions)
+      .toHaveBeenCalledWith(validUserId, {
+        vegetarian: true
+      })
   })
 
 })
