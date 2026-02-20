@@ -105,9 +105,17 @@ describe('POST /api/meal-plans/sessions/:sessionId/regenerate-meal (Integration)
   })
 
   it('regenerates single meal successfully', async () => {
-   
+
+    const updatedSession = {
+      ...fakeSession,
+      currentMealPlan: fakeMealPlan
+    }
+
     mockDataAccess.findUserById.mockResolvedValue(fakeUser)
-    mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
+
+    mockDataAccess.findSessionById
+      .mockResolvedValueOnce(fakeSession)      // guard
+      .mockResolvedValueOnce(updatedSession)   // final return
 
     mockContextBuilder.buildSessionContext.mockReturnValue(fakeSession)
     mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
@@ -119,6 +127,9 @@ describe('POST /api/meal-plans/sessions/:sessionId/regenerate-meal (Integration)
       provider: 'openai'
     } as any)
 
+    mockDataAccess.addSessionModification.mockResolvedValue(updatedSession)
+    mockDataAccess.updateSessionMealPlan.mockResolvedValue(updatedSession)
+
     const res = await request(app)
       .post(endpoint(validSessionId))
       .send({
@@ -128,9 +139,12 @@ describe('POST /api/meal-plans/sessions/:sessionId/regenerate-meal (Integration)
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
-    expect(res.body.data.mealPlan).toEqual(fakeMealPlan)
+
+    expect(res.body.data.session).toEqual(updatedSession)
 
     expect(mockDataAccess.updateSessionMealPlan)
       .toHaveBeenCalledWith(validSessionId, fakeMealPlan)
   })
+
+
 })

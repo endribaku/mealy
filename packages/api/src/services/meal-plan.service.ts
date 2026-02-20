@@ -67,10 +67,7 @@ export class MealPlanService {
 	// GENERATE NEW PLAN
 	// ============================================================
 
-	async generateMealPlan(
-		userId: string,
-		options?: GenerationOptions
-	) {
+	async generateMealPlan(userId: string, options?: GenerationOptions) {
 
 		const user = await this.ensureUserExists(userId)
 
@@ -88,15 +85,17 @@ export class MealPlanService {
 			result.mealPlan
 		)
 
+		const updatedSession = await this.dataAccess.findSessionById(session.id)
+
 		return {
-			sessionId: session.id,
-			mealPlan: result.mealPlan,
+			session: updatedSession,
 			metadata: {
-				tokensUsed: result.tokensUsed.totalTokens,
-				generationTime: result.generationTime
+			tokensUsed: result.tokensUsed.totalTokens,
+			generationTime: result.generationTime
 			}
 		}
 	}
+
 
 	// ============================================================
 	// REGENERATE SINGLE MEAL
@@ -140,12 +139,14 @@ export class MealPlanService {
             reason
         })
 
-        await this.dataAccess.updateSessionMealPlan(
-            sessionId,
-            result.mealPlan
-        )
+		await this.dataAccess.updateSessionMealPlan(
+			sessionId,
+			result.mealPlan
+		)
 
-        return result.mealPlan
+		const updatedSession = await this.dataAccess.findSessionById(sessionId)
+
+		return updatedSession
     }
 
 
@@ -154,41 +155,47 @@ export class MealPlanService {
 	// ============================================================
 
 	async regenerateFullPlan(
-		userId: string,
-		sessionId: string,
-		reason: string,
-		options?: GenerationOptions
+	userId: string,
+	sessionId: string,
+	reason: string,
+	options?: GenerationOptions
 	) {
-
 		const user = await this.ensureUserExists(userId)
 
-		await this.ensureSessionOwnership(userId, sessionId)
+		// Ensure ownership AND get session
+		const session = await this.ensureSessionOwnership(userId, sessionId)
 
-		await this.dataAccess.addSessionModification(sessionId, {
-			action: 'regenerate-all',
-			reason
-		})
-
-		const updatedSession = await this.dataAccess.findSessionById(sessionId)
-
+		// Build context from CURRENT session
 		const context = this.contextBuilder.buildFullContext(
 			user,
-			this.contextBuilder.buildSessionContext(updatedSession!)
+			this.contextBuilder.buildSessionContext(session)
 		)
 
+		// 🧠 Call AI FIRST (no DB writes yet)
 		const result = await this.generator.regenerateFullPlan(
 			context,
 			reason,
 			options
 		)
 
+		// 💾 Persist only after success
+
 		await this.dataAccess.updateSessionMealPlan(
 			sessionId,
 			result.mealPlan
 		)
 
-		return result.mealPlan
+		await this.dataAccess.addSessionModification(sessionId, {
+			action: 'regenerate-all',
+			reason
+		})
+
+		// Fetch fresh updated session
+		const updatedSession = await this.dataAccess.findSessionById(sessionId)
+
+		return updatedSession
 	}
+
 
 	// ============================================================
 	// CONFIRM PLAN
@@ -202,10 +209,17 @@ export class MealPlanService {
 			throw new HttpError('No meal plan to confirm', 400)
 		}
 
-		return this.dataAccess.saveMealPlan(
+		await this.dataAccess.saveMealPlan(
 			userId,
 			session.currentMealPlan
-		)
+			)
+
+			await this.dataAccess.updateSessionStatus(
+				sessionId,
+				'confirmed'
+			)
+
+		return await this.dataAccess.findSessionById(sessionId)
 	}
 
 	// ============================================================

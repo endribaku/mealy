@@ -10,13 +10,11 @@ export interface GenerateMealPlanRequest {
 
 export interface GenerateMealPlanResponse {
 	sessionId: string
-	mealPlan: MealPlan
 	metadata: {
 		tokensUsed: number
 		generationTime: number
 	}
 }
-
 
 /* ============================================================
    REGENERATE SINGLE MEAL
@@ -48,7 +46,6 @@ export interface RegenerateFullPlanResponse {
 	mealPlan: MealPlan
 }
 
-
 /* ============================================================
    CONFIRM PLAN
 ============================================================ */
@@ -71,8 +68,6 @@ export interface MealPlanHistoryResponse {
 	id: string
 	mealPlan: MealPlan
 }
-
-
 /* ============================================================
    GENERIC RESPONSE WRAPPERS
 ============================================================ */

@@ -102,7 +102,23 @@ describe('POST /api/meal-plans (Integration)', () => {
       provider: 'openai'
     } as any)
 
-    mockDataAccess.createSession.mockResolvedValue(fakeSession)
+    const createdSession = {
+      id: '8f14e45f-ea4e-4cde-b123-123456789abc',
+      userId: validUserId,
+      currentMealPlan: undefined,
+      modifications: [],
+      temporaryConstraints: [],
+      status: 'active'
+    } as any
+
+    const updatedSession = {
+      ...createdSession,
+      currentMealPlan: fakeMealPlan
+    }
+
+    mockDataAccess.createSession.mockResolvedValue(createdSession)
+    mockDataAccess.updateSessionMealPlan.mockResolvedValue(updatedSession)
+    mockDataAccess.findSessionById = jest.fn().mockResolvedValue(updatedSession)
 
     const res = await request(app)
       .post(endpoint())
@@ -115,9 +131,9 @@ describe('POST /api/meal-plans (Integration)', () => {
     expect(res.status).toBe(201)
     expect(res.body.success).toBe(true)
 
-    expect(res.body.data.sessionId).toBe(fakeSession.id)
-    expect(res.body.data.mealPlan).toEqual(fakeMealPlan)
+    expect(res.body.data.session).toEqual(updatedSession)
     expect(res.body.data.metadata.tokensUsed).toBe(123)
+    expect(res.body.data.metadata.generationTime).toBe(200)
 
     expect(mockContextBuilder.buildFullContext)
       .toHaveBeenCalled()
@@ -126,8 +142,9 @@ describe('POST /api/meal-plans (Integration)', () => {
       .toHaveBeenCalled()
 
     expect(mockDataAccess.updateSessionMealPlan)
-      .toHaveBeenCalledWith(fakeSession.id, fakeMealPlan)
+      .toHaveBeenCalledWith(createdSession.id, fakeMealPlan)
   })
+
 
   // ============================================================
   // 4️⃣ AI Limiter Trigger

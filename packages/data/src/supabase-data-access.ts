@@ -296,6 +296,29 @@ export class SupabaseDataAccess implements IDataAccess {
     return this.deserializeSession(data)
   }
 
+  async updateSessionStatus(
+    sessionId: string,
+    status: Session['status']
+  ): Promise<Session> {
+
+    const { data, error } = await this.supabase
+      .from('sessions')
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to update session status: ${error.message}`)
+    }
+
+    return this.deserializeSession(data)
+  }
+
+
   async addSessionModification(
     sessionId: string,
     modification: {

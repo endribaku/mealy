@@ -6,7 +6,8 @@
   "scripts": {
     "test": "pnpm --filter @mealy/engine --filter @mealy/api test",
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "mobile": "pnpm --filter mobile start"
   },
   "keywords": [],
   "author": "",

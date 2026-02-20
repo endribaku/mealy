@@ -76,6 +76,11 @@ export interface IDataAccess {
     }
   ): Promise<Session>
 
+  updateSessionStatus(
+    sessionId: string,
+    status: Session['status']
+  ): Promise<Session>
+
   addSessionConstraint(
     sessionId: string,
     constraint: string

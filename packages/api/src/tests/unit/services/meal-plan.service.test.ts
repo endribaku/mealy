@@ -80,6 +80,7 @@ describe('MealPlanService', () => {
 
       mockDataAccess.findUserById.mockResolvedValue(fakeUser)
       mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
+
       mockGenerator.generateMealPlan.mockResolvedValue({
         mealPlan: fakeMealPlan,
         tokensUsed: { totalTokens: 100 },
@@ -89,16 +90,27 @@ describe('MealPlanService', () => {
 
       mockDataAccess.createSession.mockResolvedValue(fakeSession)
 
+      const updatedSession = {
+        ...fakeSession,
+        currentMealPlan: fakeMealPlan
+      }
+
+      mockDataAccess.updateSessionMealPlan.mockResolvedValue(updatedSession)
+      mockDataAccess.findSessionById.mockResolvedValue(updatedSession)
+
       const result = await service.generateMealPlan('u1')
 
-      expect(result.sessionId).toBe('s1')
-      expect(result.mealPlan).toBe(fakeMealPlan)
+      expect(result.session).toEqual(updatedSession)
       expect(result.metadata.tokensUsed).toBe(100)
 
       expect(mockDataAccess.updateSessionMealPlan)
         .toHaveBeenCalledWith('s1', fakeMealPlan)
     })
   })
+
+  // ============================================================
+  // REGENERATE SINGLE
+  // ============================================================
 
   // ============================================================
   // REGENERATE SINGLE
@@ -137,8 +149,17 @@ describe('MealPlanService', () => {
 
     it('regenerates successfully', async () => {
 
+      const updatedSession = {
+        ...fakeSession,
+        currentMealPlan: fakeMealPlan
+      }
+
       mockDataAccess.findUserById.mockResolvedValue(fakeUser)
-      mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
+
+      // 🔥 IMPORTANT FIX: sequential mock values
+      mockDataAccess.findSessionById
+        .mockResolvedValueOnce(fakeSession)      // first call (ensureSessionExists)
+        .mockResolvedValueOnce(updatedSession)   // second call (after update)
 
       mockContextBuilder.buildSessionContext.mockReturnValue({} as any)
       mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
@@ -149,6 +170,9 @@ describe('MealPlanService', () => {
         generationTime: 100
       } as any)
 
+      mockDataAccess.addSessionModification.mockResolvedValue(updatedSession)
+      mockDataAccess.updateSessionMealPlan.mockResolvedValue(updatedSession)
+
       const result = await service.regenerateSingleMeal(
         'u1',
         's1',
@@ -156,13 +180,14 @@ describe('MealPlanService', () => {
         'reason'
       )
 
-      expect(result).toBe(fakeMealPlan)
+      expect(result).toEqual(updatedSession)
 
       expect(mockDataAccess.addSessionModification).toHaveBeenCalled()
       expect(mockDataAccess.updateSessionMealPlan)
         .toHaveBeenCalledWith('s1', fakeMealPlan)
     })
   })
+
 
   // ============================================================
   // REGENERATE FULL
@@ -196,8 +221,6 @@ describe('MealPlanService', () => {
       mockDataAccess.findUserById.mockResolvedValue(fakeUser)
       mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
 
-      mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
-
       mockContextBuilder.buildSessionContext.mockReturnValue({} as any)
       mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
 
@@ -207,13 +230,21 @@ describe('MealPlanService', () => {
         generationTime: 120
       } as any)
 
+      const updatedSession = {
+        ...fakeSession,
+        currentMealPlan: fakeMealPlan
+      }
+
+      mockDataAccess.updateSessionMealPlan.mockResolvedValue(updatedSession)
+      mockDataAccess.findSessionById.mockResolvedValue(updatedSession)
+
       const result = await service.regenerateFullPlan(
         'u1',
         's1',
         'reason'
       )
 
-      expect(result).toBe(fakeMealPlan)
+      expect(result).toEqual(updatedSession)
       expect(mockDataAccess.updateSessionMealPlan)
         .toHaveBeenCalledWith('s1', fakeMealPlan)
     })
@@ -238,23 +269,48 @@ describe('MealPlanService', () => {
     })
 
     it('confirms successfully', async () => {
-      mockDataAccess.findSessionById.mockResolvedValue({
+
+      const sessionWithPlan = {
         id: 's1',
         userId: 'u1',
         currentMealPlan: fakeMealPlan
-      } as any)
+      }
+
+      const confirmedSession = {
+        ...sessionWithPlan,
+        status: 'confirmed'
+      }
+
+      // 🔥 Sequential mock for two calls
+      mockDataAccess.findSessionById
+        .mockResolvedValueOnce(sessionWithPlan as any)  // ensureSessionOwnership
+        .mockResolvedValueOnce(confirmedSession as any) // final reload
 
       mockDataAccess.saveMealPlan.mockResolvedValue({
         ...fakeMealPlan,
         id: 'p1'
       } as any)
 
+      mockDataAccess.updateSessionStatus = jest
+        .fn()
+        .mockResolvedValue(confirmedSession)
+
       const result = await service.confirmMealPlan('u1', 's1')
 
-      expect(mockDataAccess.saveMealPlan).toHaveBeenCalled()
-      expect(result.id).toBe('p1')
+      expect(mockDataAccess.saveMealPlan)
+        .toHaveBeenCalledWith('u1', fakeMealPlan)
+
+      expect(mockDataAccess.updateSessionStatus)
+        .toHaveBeenCalledWith('s1', 'confirmed')
+
+      expect(result).toEqual(confirmedSession)
     })
-  })
+
+
+
+
+
+
 
   // ============================================================
   // DELETE PLAN
@@ -317,5 +373,5 @@ describe('MealPlanService', () => {
       expect(result).toEqual([])
     })
   })
-
+  })
 })

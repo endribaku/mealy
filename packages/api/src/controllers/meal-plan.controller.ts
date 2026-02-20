@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { MealPlanService } from '../services/meal-plan.service'
-import { GenerationOptions, MealPlan, StoredMealPlan } from '@mealy/engine'
+import { GenerationOptions, MealPlan, StoredMealPlan, Session } from '@mealy/engine'
 import { logger } from '../misc/logger'
 import {
 	GenerateMealPlanResponse,
@@ -64,7 +64,7 @@ export class MealPlanController {
 	async regenerateSingle(
 		req: Request<
 			{ sessionId: string },
-			BasicSuccessResponse<{ mealPlan: MealPlan }>,
+			BasicSuccessResponse<{ session: Session}>,
 			{
 				mealId: string
 				reason: string
@@ -86,7 +86,7 @@ export class MealPlanController {
 				mealId
 			})
 
-			const mealPlan = await this.service.regenerateSingleMeal(
+			const session = await this.service.regenerateSingleMeal(
 				userId,
 				sessionId,
 				mealId,
@@ -103,7 +103,7 @@ export class MealPlanController {
 
 			return res.json({
 				success: true,
-				data: { mealPlan }
+				data: { session }
 			})
 
 		} catch (error) {
@@ -119,7 +119,7 @@ export class MealPlanController {
 	async regenerateFull(
 		req: Request<
 			{ sessionId: string },
-			BasicSuccessResponse<{ mealPlan: MealPlan }>,
+			BasicSuccessResponse<{ session: Session }>,
 			{
 				reason: string
 				options?: GenerationOptions
@@ -140,7 +140,7 @@ export class MealPlanController {
 				reason
 			})
 
-			const mealPlan = await this.service.regenerateFullPlan(
+			const session = await this.service.regenerateFullPlan(
 				userId,
 				sessionId,
 				reason,
@@ -155,7 +155,7 @@ export class MealPlanController {
 
 			return res.json({
 				success: true,
-				data: { mealPlan }
+				data: { session }
 			})
 
 		} catch (error) {
@@ -171,7 +171,7 @@ export class MealPlanController {
 	async confirm(
 		req: Request<
 			{ sessionId: string },
-			BasicSuccessResponse<{ mealPlan: StoredMealPlan & { id: string } }>
+			BasicSuccessResponse<{ session: Session }>
 		>,
 		res: Response,
 		next: NextFunction
@@ -186,7 +186,7 @@ export class MealPlanController {
 				sessionId
 			})
 
-			const savedPlan = await this.service.confirmMealPlan(
+			const session = await this.service.confirmMealPlan(
 				userId,
 				sessionId
 			)
@@ -199,7 +199,7 @@ export class MealPlanController {
 
 			return res.json({
 				success: true,
-				data: { mealPlan: savedPlan }
+				data: { session }
 			})
 
 		} catch (error) {

@@ -132,7 +132,16 @@ describe('POST /api/meal-plans/sessions/:sessionId/regenerate (Integration)', ()
 
   it('regenerates full plan successfully', async () => {
 
-    mockDataAccess.findSessionById.mockResolvedValue(fakeSession)
+    const updatedSession = {
+      ...fakeSession,
+      currentMealPlan: fakeMealPlan
+    }
+
+    mockDataAccess.findUserById.mockResolvedValue(fakeUser)
+
+    mockDataAccess.findSessionById
+      .mockResolvedValueOnce(fakeSession)      // ensureSessionOwnership
+      .mockResolvedValueOnce(updatedSession)   // final reload
 
     mockContextBuilder.buildSessionContext.mockReturnValue(fakeSession)
     mockContextBuilder.buildFullContext.mockReturnValue(fakeContext)
@@ -144,13 +153,17 @@ describe('POST /api/meal-plans/sessions/:sessionId/regenerate (Integration)', ()
       provider: 'openai'
     } as any)
 
+    mockDataAccess.updateSessionMealPlan.mockResolvedValue(updatedSession)
+    mockDataAccess.addSessionModification.mockResolvedValue(updatedSession)
+
     const res = await request(app)
       .post(endpoint(validSessionId))
       .send({ reason: 'Change everything' })
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
-    expect(res.body.data.mealPlan).toEqual(fakeMealPlan)
+
+    expect(res.body.data.session).toEqual(updatedSession)
 
     expect(mockDataAccess.addSessionModification)
       .toHaveBeenCalled()
@@ -158,5 +171,7 @@ describe('POST /api/meal-plans/sessions/:sessionId/regenerate (Integration)', ()
     expect(mockDataAccess.updateSessionMealPlan)
       .toHaveBeenCalledWith(validSessionId, fakeMealPlan)
   })
+
+
 
 })

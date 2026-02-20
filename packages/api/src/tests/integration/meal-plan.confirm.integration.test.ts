@@ -43,6 +43,7 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
   beforeEach(() => {
 
     mockDataAccess = {
+      updateSessionStatus: jest.fn(),
       findUserById: jest.fn(),
       findSessionById: jest.fn(),
       saveMealPlan: jest.fn()
@@ -106,20 +107,37 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
 
   it('confirms meal plan successfully', async () => {
 
-    mockDataAccess.findSessionById.mockResolvedValue(fakeSessionWithPlan)
+    const confirmedSession = {
+      ...fakeSessionWithPlan,
+      status: 'confirmed'
+    }
+
+    mockDataAccess.findSessionById
+      .mockResolvedValueOnce(fakeSessionWithPlan)
+      .mockResolvedValueOnce(confirmedSession)
+
     mockDataAccess.saveMealPlan.mockResolvedValue(savedPlan)
+
+    mockDataAccess.updateSessionStatus = jest
+      .fn()
+      .mockResolvedValue(confirmedSession)
 
     const res = await request(app)
       .post(endpoint(validSessionId))
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
-    expect(res.body.data.mealPlan).toEqual(savedPlan)
+
+    expect(res.body.data.session).toEqual(confirmedSession)
 
     expect(mockDataAccess.saveMealPlan)
       .toHaveBeenCalledWith(
         validUserId,
         fakeSessionWithPlan.currentMealPlan
       )
+
+    expect(mockDataAccess.updateSessionStatus)
+      .toHaveBeenCalledWith(validSessionId, 'confirmed')
   })
+
 })
