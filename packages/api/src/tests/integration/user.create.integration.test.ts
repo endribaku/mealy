@@ -97,6 +97,6 @@ describe('POST /api/users (Integration)', () => {
     expect(res.body.data.email).toBe(validEmail)
 
     expect(mockDataAccess.createUser)
-      .toHaveBeenCalledWith(validBody)
+      .toHaveBeenCalledWith(validBody, validUserId)
   })
 })

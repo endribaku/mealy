@@ -1,20 +1,25 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import './global.css'
+import React from 'react'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './lib/query-client'
+import { AuthProvider } from './contexts/AuthContext'
+import { RootNavigator } from './navigation/RootNavigator'
+import { useAppState } from './hooks/useAppState'
+
+function AppContent() {
+  useAppState()
+  return <RootNavigator />
+}
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
+  )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

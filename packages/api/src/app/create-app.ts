@@ -29,7 +29,7 @@ interface AppDependencies {
   dataAccess: IDataAccess
   contextBuilder: IContextBuilder
   generator: IMealPlanGenerator
-  corsOrigin?: string
+  corsOrigin?: string | string[]
   enableAuth?: boolean,
   enableLogging?: boolean
   testUser?: { id: string }

@@ -43,8 +43,8 @@ export const UpdatePreferencesBodySchema = z.object({
 	favoriteCuisines: z.array(z.string()).optional(),
 	favoriteIngredients: z.array(z.string()).optional(),
 	favoriteMealTypes: z.array(z.string()).optional(),
-	spiceLevel: z.number().min(0).max(5).optional(),
-	preferredComplexity: z.number().min(0).max(5).optional()
+	spiceLevel: z.enum(['none', 'mild', 'medium', 'spicy', 'extra-spicy']).optional(),
+	preferredComplexity: z.enum(['very-simple', 'simple', 'moderate', 'complex', 'advanced']).optional()
 }).strict()
 
 // ============================================================

@@ -48,7 +48,8 @@ export class UserController {
 				event: 'user_create_requested'
 			})
 
-			const user = await this.service.create(req.body)
+			const userId = (req as any).user?.id
+			const user = await this.service.create(req.body, userId)
 
 			logger.info({
 				event: 'user_create_success',

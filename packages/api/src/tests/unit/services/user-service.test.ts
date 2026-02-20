@@ -84,7 +84,7 @@ describe('UserService', () => {
       const result = await service.create({ email: 'test@test.com' } as any)
 
       expect(mockDataAccess.createUser)
-        .toHaveBeenCalledWith({ email: 'test@test.com' })
+        .toHaveBeenCalledWith({ email: 'test@test.com' }, undefined)
 
       expect(result).toBe(fakeUser)
     })

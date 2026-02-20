@@ -1,20 +1,21 @@
 import { api } from '../lib/api'
-import { ApiResponse } from './types'
+import { ApiResponse, Session } from './types'
 
-export type Session = {
-  id: string
-  createdAt: string
-  // add more once you know full shape
-}
-
-export async function getSessionById(sessionId: string) {
+// GET /sessions/:sessionId
+export async function getSessionById(sessionId: string, signal?: AbortSignal) {
   const res = await api.get<ApiResponse<Session>>(
-    `/sessions/${sessionId}`
+    `/sessions/${sessionId}`,
+    { signal }
   )
 
   return res.data.data
 }
 
+// DELETE /sessions/:sessionId
 export async function deleteSession(sessionId: string) {
-  await api.delete(`/sessions/${sessionId}`)
+  const res = await api.delete<ApiResponse<{ deleted: true }>>(
+    `/sessions/${sessionId}`
+  )
+
+  return res.data.data
 }

@@ -12,7 +12,9 @@ export function createProductionApp() {
     dataAccess,
     contextBuilder,
     generator,
-    corsOrigin: process.env.CORS_ORIGIN,
+    corsOrigin: process.env.CORS_ORIGIN?.includes(',')
+      ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+      : process.env.CORS_ORIGIN,
     enableAuth: true,
     enableLogging: true
   })

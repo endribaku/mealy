@@ -24,8 +24,7 @@ export class SupabaseDataAccess implements IDataAccess {
 
   constructor() {
     const supabaseUrl = config.database.supabaseUrl
-    const supabaseKey = config.database.supabaseAnonKey
-
+    const supabaseKey = config.database.supabaseServiceRoleKey
 
     this.supabase = createClient(supabaseUrl, supabaseKey)
   }
@@ -68,8 +67,8 @@ export class SupabaseDataAccess implements IDataAccess {
     return this.deserializeUser(data)
   }
 
-  async createUser(user: Omit<User, 'id'>): Promise<User> {
-    const userId = crypto.randomUUID()
+  async createUser(user: Omit<User, 'id'>, id?: string): Promise<User> {
+    const userId = id ?? crypto.randomUUID()
 
     const defaultMetadata = {
       totalMealPlansGenerated: 0,
@@ -77,14 +76,23 @@ export class SupabaseDataAccess implements IDataAccess {
       averageRating: null,
     }
 
+    const defaultPreferences = {
+      dislikedIngredients: [],
+      dislikedCuisines: [],
+      dislikedMealTypes: [],
+      favoriteCuisines: [],
+      favoriteIngredients: [],
+      favoriteMealTypes: [],
+    }
+
     const { data, error } = await this.supabase
       .from('users')
       .insert({
         id: userId,
         email: user.email,
-        profile: user.profile,                     // JSONB NOT NULL
-        learned_preferences: user.learnedPreferences, // JSONB NOT NULL
-        metadata: defaultMetadata,                 // JSONB NOT NULL
+        profile: user.profile,
+        learned_preferences: user.learnedPreferences ?? defaultPreferences,
+        metadata: defaultMetadata,
         dietary_restrictions: user.dietaryRestrictions ?? null,
         is_active: true,
       })

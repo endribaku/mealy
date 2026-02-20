@@ -25,7 +25,7 @@ export interface IDataAccess {
 
   findUserByEmail(email: string): Promise<User | null>
 
-  createUser(user: Omit<User, 'id'>): Promise<User>
+  createUser(user: Omit<User, 'id'>, id?: string): Promise<User>
 
   updateUserProfile(
     userId: string,

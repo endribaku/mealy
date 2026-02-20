@@ -43,8 +43,8 @@ export class UserService {
 	// CREATE USER
 	// ============================================================
 
-	async create(userInput: Parameters<IDataAccess['createUser']>[0]) {
-		return this.dataAccess.createUser(userInput)
+	async create(userInput: Parameters<IDataAccess['createUser']>[0], id?: string) {
+		return this.dataAccess.createUser(userInput, id)
 	}
 
 	// ============================================================

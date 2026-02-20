@@ -7,6 +7,9 @@
     "test": "pnpm --filter @mealy/engine --filter @mealy/api test",
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build",
+    "dev": "pnpm --parallel --filter @mealy/api --filter mobile dev",
+    "dev:api": "pnpm --filter @mealy/api dev",
+    "dev:mobile": "pnpm --filter mobile dev",
     "mobile": "pnpm --filter mobile start"
   },
   "keywords": [],

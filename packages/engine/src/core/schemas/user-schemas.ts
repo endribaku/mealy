@@ -71,10 +71,10 @@ export const GoalEnum = z.enum([
 export const UserProfileSchema = z.object({
   name: z.string().min(1),
 
-  diet: DietTypeEnum,
-  calorieTarget: z.number().int().min(1000).max(5000),
+  diet: DietTypeEnum.optional(),
+  calorieTarget: z.number().int().min(1000).max(5000).optional(),
 
-  cookingSkill: CookingSkillEnum,
+  cookingSkill: CookingSkillEnum.optional(),
   householdSize: z.number().int().min(1).max(20).default(1),
 
   measurementSystem: MeasurementSystemEnum.default('imperial'),
