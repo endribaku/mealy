@@ -14,7 +14,24 @@ export type OnboardingStackParamList = {
   OnboardingComplete: undefined
 }
 
-export type MainStackParamList = {
-  Home: undefined
+export type TabParamList = {
+  Today: undefined
   Calendar: undefined
+  Profile: undefined
+}
+
+export type MainStackParamList = {
+  Tabs: undefined
+  Generating: undefined
+  PlanReview: { sessionId: string }
+  RegenerateMeal: { sessionId: string; mealId: string; mealName: string }
+  RegenerateFull: { sessionId: string }
+  ConfirmPlan: { sessionId: string; numberOfDays: number }
+  PlanSuccess: { startDate: string }
+  MealDetail: { planId: string; dayNumber: number; mealType: 'breakfast' | 'lunch' | 'dinner' }
+  PlanHistory: undefined
+  PlanDetail: { planId: string }
+  EditProfile: undefined
+  EditPreferences: undefined
+  EditRestrictions: undefined
 }
