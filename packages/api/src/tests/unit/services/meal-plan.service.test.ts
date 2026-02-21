@@ -37,6 +37,8 @@ describe('MealPlanService', () => {
       saveMealPlan: jest.fn(),
       findMealPlanById: jest.fn(),
       findMealPlansByUserId: jest.fn(),
+      findMealPlansByDateRange: jest.fn(),
+      hasOverlappingMealPlan: jest.fn(),
       deleteMealPlan: jest.fn(),
       applySessionRegeneration: jest.fn()
     } as any
@@ -298,7 +300,7 @@ describe('MealPlanService', () => {
       const result = await service.confirmMealPlan('u1', 's1')
 
       expect(mockDataAccess.saveMealPlan)
-        .toHaveBeenCalledWith('u1', fakeMealPlan)
+        .toHaveBeenCalledWith('u1', fakeMealPlan, undefined)
 
       expect(mockDataAccess.updateSessionStatus)
         .toHaveBeenCalledWith('s1', 'confirmed')

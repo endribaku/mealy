@@ -171,7 +171,8 @@ export class MealPlanController {
 	async confirm(
 		req: Request<
 			{ sessionId: string },
-			BasicSuccessResponse<{ session: Session }>
+			BasicSuccessResponse<{ session: Session }>,
+			{ startDate?: string }
 		>,
 		res: Response,
 		next: NextFunction
@@ -179,16 +180,19 @@ export class MealPlanController {
 		try {
 			const userId = (req as any).user.id
 			const { sessionId } = req.params
+			const { startDate } = req.body
 
 			logger.info({
 				event: 'meal_plan_confirm_requested',
 				userId,
-				sessionId
+				sessionId,
+				startDate
 			})
 
 			const session = await this.service.confirmMealPlan(
 				userId,
-				sessionId
+				sessionId,
+				startDate
 			)
 
 			logger.info({
@@ -200,6 +204,37 @@ export class MealPlanController {
 			return res.json({
 				success: true,
 				data: { session }
+			})
+
+		} catch (error) {
+			next(error)
+		}
+	}
+
+	// ============================================================
+	// GET CALENDAR
+	// GET /api/meal-plans/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
+	// ============================================================
+
+	async getCalendar(
+		req: Request<
+			{},
+			BasicSuccessResponse<StoredMealPlan[]>,
+			{},
+			{ from: string; to: string }
+		>,
+		res: Response,
+		next: NextFunction
+	) {
+		try {
+			const userId = (req as any).user.id
+			const { from, to } = req.query
+
+			const plans = await this.service.getMealPlansForCalendar(userId, from, to)
+
+			return res.json({
+				success: true,
+				data: plans
 			})
 
 		} catch (error) {

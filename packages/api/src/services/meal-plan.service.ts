@@ -201,7 +201,7 @@ export class MealPlanService {
 	// CONFIRM PLAN
 	// ============================================================
 
-	async confirmMealPlan(userId: string, sessionId: string) {
+	async confirmMealPlan(userId: string, sessionId: string, startDate?: string) {
 
 		const session = await this.ensureSessionOwnership(userId, sessionId)
 
@@ -209,17 +209,47 @@ export class MealPlanService {
 			throw new HttpError('No meal plan to confirm', 400)
 		}
 
+		if (startDate) {
+			const numberOfDays = session.currentMealPlan.days.length
+			const end = new Date(startDate)
+			end.setDate(end.getDate() + numberOfDays - 1)
+			const endDateStr = end.toISOString().split('T')[0]
+
+			const hasOverlap = await this.dataAccess.hasOverlappingMealPlan(
+				userId,
+				startDate,
+				endDateStr
+			)
+
+			if (hasOverlap) {
+				throw new HttpError(
+					'Date range overlaps with an existing meal plan. Choose different dates.',
+					409
+				)
+			}
+		}
+
 		await this.dataAccess.saveMealPlan(
 			userId,
-			session.currentMealPlan
-			)
+			session.currentMealPlan,
+			startDate
+		)
 
-			await this.dataAccess.updateSessionStatus(
-				sessionId,
-				'confirmed'
-			)
+		await this.dataAccess.updateSessionStatus(
+			sessionId,
+			'confirmed'
+		)
 
 		return await this.dataAccess.findSessionById(sessionId)
+	}
+
+	// ============================================================
+	// CALENDAR
+	// ============================================================
+
+	async getMealPlansForCalendar(userId: string, fromDate: string, toDate: string) {
+		await this.ensureUserExists(userId)
+		return this.dataAccess.findMealPlansByDateRange(userId, fromDate, toDate)
 	}
 
 	// ============================================================

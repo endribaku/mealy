@@ -481,11 +481,19 @@ export class SupabaseDataAccess implements IDataAccess {
 
   async saveMealPlan(
     userId: string,
-    mealPlan: MealPlan
+    mealPlan: MealPlan,
+    startDate?: string
   ): Promise<StoredMealPlan> {
 
     const mealPlanId = crypto.randomUUID()
     const now = new Date().toISOString()
+
+    let endDate: string | null = null
+    if (startDate) {
+      const end = new Date(startDate)
+      end.setDate(end.getDate() + mealPlan.days.length - 1)
+      endDate = end.toISOString().split('T')[0]
+    }
 
     const { data, error } = await this.supabase
       .from('meal_plans')
@@ -496,22 +504,21 @@ export class SupabaseDataAccess implements IDataAccess {
         number_of_days: mealPlan.days.length,
         status: 'active',
         created_at: now,
-        confirmed_at: now
+        confirmed_at: now,
+        start_date: startDate ?? null,
+        end_date: endDate
       })
       .select()
       .single()
 
     if (error) {
+      if (error.code === '23P01') {
+        throw new Error('OVERLAP: Date range overlaps with an existing active meal plan')
+      }
       throw new Error(`Failed to save meal plan: ${error.message}`)
     }
 
-    return {
-      id: data.id,
-      userId: data.user_id,
-      mealPlan: data.plan,
-      createdAt: data.created_at,
-      status: data.status
-    }
+    return this.deserializeMealPlan(data)
   }
 
 
@@ -533,13 +540,7 @@ export class SupabaseDataAccess implements IDataAccess {
 
     if (!data) return null
 
-    return {
-      id: data.id,
-      userId: data.user_id,
-      mealPlan: data.plan,
-      createdAt: data.created_at,
-      status: data.status
-    }
+    return this.deserializeMealPlan(data)
   }
 
 
@@ -561,13 +562,52 @@ export class SupabaseDataAccess implements IDataAccess {
       )
     }
 
-    return (data || []).map(row => ({
-      id: row.id,
-      userId: row.user_id,
-      mealPlan: row.plan,
-      createdAt: row.created_at,
-      status: row.status
-    }))
+    return (data || []).map(row => this.deserializeMealPlan(row))
+  }
+
+  async findMealPlansByDateRange(
+    userId: string,
+    fromDate: string,
+    toDate: string
+  ): Promise<StoredMealPlan[]> {
+
+    const { data, error } = await this.supabase
+      .from('meal_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .not('start_date', 'is', null)
+      .lte('start_date', toDate)
+      .gte('end_date', fromDate)
+      .order('start_date', { ascending: true })
+
+    if (error) {
+      throw new Error(`Failed to find meal plans by date range: ${error.message}`)
+    }
+
+    return (data || []).map(row => this.deserializeMealPlan(row))
+  }
+
+  async hasOverlappingMealPlan(
+    userId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<boolean> {
+
+    const { count, error } = await this.supabase
+      .from('meal_plans')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .not('start_date', 'is', null)
+      .lte('start_date', endDate)
+      .gte('end_date', startDate)
+
+    if (error) {
+      throw new Error(`Failed to check overlap: ${error.message}`)
+    }
+
+    return (count ?? 0) > 0
   }
 
 
@@ -654,6 +694,21 @@ export class SupabaseDataAccess implements IDataAccess {
     })
   }
 
+
+  /**
+   * Deserialize database row to StoredMealPlan object
+   */
+  private deserializeMealPlan(row: any): StoredMealPlan {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      mealPlan: row.plan,
+      createdAt: row.created_at,
+      status: row.status,
+      startDate: row.start_date ?? undefined,
+      endDate: row.end_date ?? undefined
+    }
+  }
 
   /**
    * Deserialize database row to Session object

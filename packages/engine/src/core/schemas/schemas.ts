@@ -81,6 +81,8 @@ export interface StoredMealPlan {
   mealPlan: MealPlan
   createdAt: string
   status: 'active' | 'archived' | 'deleted'
+  startDate?: string
+  endDate?: string
 }
 
 

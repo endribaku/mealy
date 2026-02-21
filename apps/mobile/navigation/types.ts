@@ -16,4 +16,5 @@ export type OnboardingStackParamList = {
 
 export type MainStackParamList = {
   Home: undefined
+  Calendar: undefined
 }

@@ -13,7 +13,10 @@ export function validate<T>(
       const parsed = schema.parse(req[property])
 
       // Replace request data with validated & typed data
-      req[property] = parsed as any
+      // Note: req.query is read-only in Express 5, so skip reassignment for query
+      if (property !== 'query') {
+        req[property] = parsed as any
+      }
 
       next()
 

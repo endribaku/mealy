@@ -86,9 +86,20 @@ export async function regenerateSingleMeal(
 }
 
 // POST /meal-plans/sessions/:sessionId/confirm
-export async function confirmSession(sessionId: string) {
+export async function confirmSession(sessionId: string, startDate?: string) {
   const res = await api.post<ApiResponse<ConfirmMealPlanResponseData>>(
-    `/meal-plans/sessions/${sessionId}/confirm`
+    `/meal-plans/sessions/${sessionId}/confirm`,
+    startDate ? { startDate } : {}
+  )
+
+  return res.data.data
+}
+
+// GET /meal-plans/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
+export async function getCalendarMealPlans(from: string, to: string, signal?: AbortSignal) {
+  const res = await api.get<ApiResponse<StoredMealPlan[]>>(
+    '/meal-plans/calendar',
+    { params: { from, to }, signal }
   )
 
   return res.data.data

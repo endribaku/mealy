@@ -97,7 +97,8 @@ export interface IDataAccess {
 
   saveMealPlan(
     userId: string,
-    mealPlan: MealPlan
+    mealPlan: MealPlan,
+    startDate?: string
   ): Promise<StoredMealPlan & { id: string }>
 
   findMealPlanById(
@@ -110,6 +111,17 @@ export interface IDataAccess {
     limit?: number
   ): Promise<StoredMealPlan[]>
 
+  findMealPlansByDateRange(
+    userId: string,
+    fromDate: string,
+    toDate: string
+  ): Promise<StoredMealPlan[]>
+
+  hasOverlappingMealPlan(
+    userId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<boolean>
 
   deleteMealPlan(mealPlanId: string): Promise<boolean>
 

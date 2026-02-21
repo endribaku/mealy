@@ -75,6 +75,7 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
 
     const res = await request(app)
       .post(endpoint(validSessionId))
+      .send({})
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
@@ -89,6 +90,7 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
 
     const res = await request(app)
       .post(endpoint(validSessionId))
+      .send({})
 
     expect(res.status).toBe(404)
     expect(res.body.success).toBe(false)
@@ -100,6 +102,7 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
 
     const res = await request(app)
       .post(endpoint(validSessionId))
+      .send({})
 
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -124,6 +127,7 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
 
     const res = await request(app)
       .post(endpoint(validSessionId))
+      .send({})
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
@@ -133,11 +137,68 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
     expect(mockDataAccess.saveMealPlan)
       .toHaveBeenCalledWith(
         validUserId,
-        fakeSessionWithPlan.currentMealPlan
+        fakeSessionWithPlan.currentMealPlan,
+        undefined
       )
 
     expect(mockDataAccess.updateSessionStatus)
       .toHaveBeenCalledWith(validSessionId, 'confirmed')
+  })
+
+  it('confirms with startDate and passes it to saveMealPlan', async () => {
+
+    const confirmedSession = {
+      ...fakeSessionWithPlan,
+      status: 'confirmed'
+    }
+
+    mockDataAccess.findSessionById
+      .mockResolvedValueOnce(fakeSessionWithPlan)
+      .mockResolvedValueOnce(confirmedSession)
+
+    mockDataAccess.saveMealPlan.mockResolvedValue(savedPlan)
+    ;(mockDataAccess as any).hasOverlappingMealPlan = jest.fn().mockResolvedValue(false)
+
+    mockDataAccess.updateSessionStatus = jest
+      .fn()
+      .mockResolvedValue(confirmedSession)
+
+    const res = await request(app)
+      .post(endpoint(validSessionId))
+      .send({ startDate: '2026-03-01' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+
+    expect(mockDataAccess.saveMealPlan)
+      .toHaveBeenCalledWith(
+        validUserId,
+        fakeSessionWithPlan.currentMealPlan,
+        '2026-03-01'
+      )
+  })
+
+  it('returns 400 for invalid startDate format', async () => {
+
+    const res = await request(app)
+      .post(endpoint(validSessionId))
+      .send({ startDate: 'not-a-date' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.success).toBe(false)
+  })
+
+  it('returns 409 when dates overlap', async () => {
+
+    mockDataAccess.findSessionById.mockResolvedValue(fakeSessionWithPlan)
+    ;(mockDataAccess as any).hasOverlappingMealPlan = jest.fn().mockResolvedValue(true)
+
+    const res = await request(app)
+      .post(endpoint(validSessionId))
+      .send({ startDate: '2026-03-01' })
+
+    expect(res.status).toBe(409)
+    expect(res.body.success).toBe(false)
   })
 
 })

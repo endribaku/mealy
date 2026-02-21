@@ -13,7 +13,9 @@ import {
 import {
 	GenerateMealPlanBodySchema,
 	RegenerateSingleBodySchema,
-	RegenerateFullBodySchema
+	RegenerateFullBodySchema,
+	ConfirmPlanBodySchema,
+	CalendarQuerySchema
 } from '../middleware/validation/meal-plan.schemas'
 
 export function createMealPlanRoutes(
@@ -51,6 +53,16 @@ export function createMealPlanRoutes(
 	router.get(
 		'/',
 		controller.getAll.bind(controller)
+	)
+
+	// ============================================================
+	// GET /meal-plans/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
+	// ============================================================
+
+	router.get(
+		'/calendar',
+		validate(CalendarQuerySchema, 'query'),
+		controller.getCalendar.bind(controller)
 	)
 
 	// ============================================================
@@ -104,6 +116,7 @@ export function createMealPlanRoutes(
 	router.post(
 		`/${ROUTE_SEGMENTS.SESSIONS}${sessionParam}${confirm}`,
 		validate(SessionParamsSchema, 'params'),
+		validate(ConfirmPlanBodySchema, 'body'),
 		controller.confirm.bind(controller)
 	)
 

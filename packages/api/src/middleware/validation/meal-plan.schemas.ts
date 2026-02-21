@@ -36,3 +36,20 @@ export const RegenerateFullBodySchema = z.object({
 	reason: z.string().min(1),
 	options: GenerationOptionsSchema.optional()
 }).strict()
+
+// ============================================================
+// CONFIRM PLAN
+// ============================================================
+
+export const ConfirmPlanBodySchema = z.object({
+	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD format').optional()
+}).strict()
+
+// ============================================================
+// CALENDAR QUERY
+// ============================================================
+
+export const CalendarQuerySchema = z.object({
+	from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD format'),
+	to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD format')
+}).strict()
