@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react'
-import { View, Text, ScrollView, SafeAreaView } from 'react-native'
+import { View, Text, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native'
 import { Calendar, DateData } from 'react-native-calendars'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigation } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { Ionicons } from '@expo/vector-icons'
 import { getCalendarMealPlans } from '../api/mealPlans'
 import {
   buildMarkedDates,
@@ -9,11 +12,17 @@ import {
   getCurrentMonth,
   getLastDayOfMonth,
   getTodayString,
+  findOverlappingPlans,
 } from '../lib/calendar-utils'
+import { confirmDialog } from '../lib/confirm-dialog'
 import { MealCard } from '../components/MealCard'
+import type { MainStackParamList } from '../navigation/types'
 import type { Day, StoredMealPlan } from '../api/types'
 
+type Nav = NativeStackNavigationProp<MainStackParamList>
+
 export function CalendarScreen() {
+  const navigation = useNavigation<Nav>()
   const today = getTodayString()
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth())
   const [selectedDate, setSelectedDate] = useState(today)
@@ -32,7 +41,7 @@ export function CalendarScreen() {
   const markedDates = useMemo(() => {
     const result: Record<string, any> = {}
 
-    for (const [dateStr, { planId }] of Object.entries(markedDatesBase)) {
+    for (const [dateStr] of Object.entries(markedDatesBase)) {
       result[dateStr] = {
         marked: true,
         dotColor: '#007AFF',
@@ -70,6 +79,28 @@ export function CalendarScreen() {
     return null
   }, [plans, selectedDate])
 
+  const handleGenerate = async (date: string) => {
+    const effectiveStart = date < today ? today : date
+    const conflicts = findOverlappingPlans(plans ?? [], effectiveStart)
+
+    if (conflicts.length > 0) {
+      const planDates = conflicts
+        .map(p => `${p.startDate} to ${p.endDate}`)
+        .join('\n')
+
+      const confirmed = await confirmDialog({
+        title: 'Replace Existing Plan?',
+        message: `This will replace your existing meal plan:\n${planDates}`,
+        confirmText: 'Replace',
+        destructive: true,
+      })
+
+      if (!confirmed) return
+    }
+
+    navigation.navigate('Generating', { startDate: effectiveStart })
+  }
+
   const handleDayPress = (day: DateData) => {
     setSelectedDate(day.dateString)
   }
@@ -83,6 +114,7 @@ export function CalendarScreen() {
     <SafeAreaView className="flex-1 bg-white">
       <Calendar
         current={`${currentMonth}-01`}
+        minDate={today}
         onDayPress={handleDayPress}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
@@ -111,14 +143,31 @@ export function CalendarScreen() {
             <MealCard label="Dinner" meal={selectedDayData.day.meals.dinner} />
           </>
         ) : (
-          <View className="items-center mt-8">
-            <Text className="text-gray-400 text-base">No meals planned</Text>
-            <Text className="text-gray-300 text-sm mt-1">
-              Generate a meal plan to fill your calendar
+          <View className="items-center mt-8 px-4">
+            <Text className="text-gray-400 text-base font-medium">No meals planned</Text>
+            <Text className="text-gray-300 text-sm mt-1 mb-5 text-center">
+              This day doesn't have a meal plan yet
             </Text>
+            <TouchableOpacity
+              className="bg-blue-50 border border-blue-200 px-5 py-3 rounded-xl"
+              onPress={() => handleGenerate(selectedDate)}
+            >
+              <Text className="text-blue-600 font-semibold text-sm">
+                Generate starting {selectedDate}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
+
+      <TouchableOpacity
+        className="absolute bottom-20 right-5 w-14 h-14 bg-blue-600 rounded-full items-center justify-center shadow-lg"
+        style={{ elevation: 5 }}
+        onPress={() => handleGenerate(selectedDate)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={28} color="white" />
+      </TouchableOpacity>
     </SafeAreaView>
   )
 }

@@ -5,7 +5,7 @@ import {
   DietaryRestrictionsUpdate,
 } from '../core/schemas/user-schemas.js'
 
-import { Session, MealPlan, StoredMealPlan } from '../core/schemas/schemas.js'
+import { Session, MealPlan, Meal, StoredMealPlan } from '../core/schemas/schemas.js'
 
 /**
  * IDataAccess
@@ -73,6 +73,7 @@ export interface IDataAccess {
       action: 'regenerate-meal' | 'regenerate-all'
       mealId?: string
       reason: string
+      rejectedMeal?: Meal
     }
   ): Promise<Session>
 
@@ -132,6 +133,7 @@ export interface IDataAccess {
       action: 'regenerate-meal' | 'regenerate-all'
       mealId?: string
       reason: string
+      rejectedMeal?: Meal
     }
   ): Promise<Session>
 

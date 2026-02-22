@@ -201,4 +201,60 @@ describe('POST /api/meal-plans/:sessionId/confirm (Integration)', () => {
     expect(res.body.success).toBe(false)
   })
 
+  it('returns 409 when dates overlap and replaceConflicting is false', async () => {
+
+    mockDataAccess.findSessionById.mockResolvedValue(fakeSessionWithPlan)
+    ;(mockDataAccess as any).hasOverlappingMealPlan = jest.fn().mockResolvedValue(true)
+
+    const res = await request(app)
+      .post(endpoint(validSessionId))
+      .send({ startDate: '2026-03-01', replaceConflicting: false })
+
+    expect(res.status).toBe(409)
+    expect(res.body.success).toBe(false)
+  })
+
+  it('deletes overlapping plans and confirms when replaceConflicting is true', async () => {
+
+    const confirmedSession = {
+      ...fakeSessionWithPlan,
+      status: 'confirmed'
+    }
+
+    const overlappingPlan1 = { id: 'overlap-1', userId: validUserId } as any
+    const overlappingPlan2 = { id: 'overlap-2', userId: validUserId } as any
+
+    mockDataAccess.findSessionById
+      .mockResolvedValueOnce(fakeSessionWithPlan)
+      .mockResolvedValueOnce(confirmedSession)
+
+    ;(mockDataAccess as any).hasOverlappingMealPlan = jest.fn().mockResolvedValue(true)
+    ;(mockDataAccess as any).findMealPlansByDateRange = jest.fn().mockResolvedValue([overlappingPlan1, overlappingPlan2])
+    ;(mockDataAccess as any).deleteMealPlan = jest.fn().mockResolvedValue(true)
+
+    mockDataAccess.saveMealPlan.mockResolvedValue(savedPlan)
+    mockDataAccess.updateSessionStatus = jest.fn().mockResolvedValue(confirmedSession)
+
+    const res = await request(app)
+      .post(endpoint(validSessionId))
+      .send({ startDate: '2026-03-01', replaceConflicting: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+
+    expect((mockDataAccess as any).findMealPlansByDateRange).toHaveBeenCalledWith(
+      validUserId,
+      '2026-03-01',
+      expect.any(String)
+    )
+    expect((mockDataAccess as any).deleteMealPlan).toHaveBeenCalledWith('overlap-1')
+    expect((mockDataAccess as any).deleteMealPlan).toHaveBeenCalledWith('overlap-2')
+
+    expect(mockDataAccess.saveMealPlan).toHaveBeenCalledWith(
+      validUserId,
+      fakeSessionWithPlan.currentMealPlan,
+      '2026-03-01'
+    )
+  })
+
 })

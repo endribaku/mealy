@@ -333,6 +333,7 @@ export class SupabaseDataAccess implements IDataAccess {
       action: 'regenerate-meal' | 'regenerate-all'
       mealId?: string
       reason: string
+      rejectedMeal?: any
     }
   ): Promise<Session> {
     // Get current session
@@ -347,6 +348,7 @@ export class SupabaseDataAccess implements IDataAccess {
       action: modification.action,
       mealId: modification.mealId,
       reason: modification.reason,
+      rejectedMeal: modification.rejectedMeal,
     }
 
     const updatedModifications = [...session.modifications, newModification]
@@ -431,6 +433,7 @@ export class SupabaseDataAccess implements IDataAccess {
       action: 'regenerate-meal' | 'regenerate-all'
       mealId?: string
       reason: string
+      rejectedMeal?: any
     }
   ): Promise<Session> {
 
@@ -446,6 +449,7 @@ export class SupabaseDataAccess implements IDataAccess {
       action: modification.action,
       mealId: modification.mealId,
       reason: modification.reason,
+      rejectedMeal: modification.rejectedMeal,
     }
 
     const updatedModifications = [

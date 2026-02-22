@@ -5,7 +5,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { getCalendarMealPlans } from '../api/mealPlans'
-import { getMealsForDate, getTodayString } from '../lib/calendar-utils'
+import { getMealsForDate, getTodayString, findOverlappingPlans } from '../lib/calendar-utils'
+import { confirmDialog } from '../lib/confirm-dialog'
 import { MealCard } from '../components/MealCard'
 import type { MainStackParamList } from '../navigation/types'
 
@@ -16,9 +17,19 @@ export function TodayScreen() {
   const navigation = useNavigation<Nav>()
   const today = getTodayString()
 
+  // Fetch plans covering today through 6 days out (7-day overlap window)
+  const weekEnd = useMemo(() => {
+    const d = new Date(today + 'T00:00:00')
+    d.setDate(d.getDate() + 6)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }, [today])
+
   const { data: plans, isLoading } = useQuery({
     queryKey: ['calendar', 'today', today],
-    queryFn: ({ signal }) => getCalendarMealPlans(today, today, signal),
+    queryFn: ({ signal }) => getCalendarMealPlans(today, weekEnd, signal),
   })
 
   const todayData = useMemo(() => {
@@ -29,6 +40,27 @@ export function TodayScreen() {
     }
     return null
   }, [plans, today])
+
+  const handleGenerate = async () => {
+    const conflicts = findOverlappingPlans(plans ?? [], today)
+
+    if (conflicts.length > 0) {
+      const planDates = conflicts
+        .map(p => `${p.startDate} to ${p.endDate}`)
+        .join('\n')
+
+      const confirmed = await confirmDialog({
+        title: 'Replace Existing Plan?',
+        message: `This will replace your existing meal plan:\n${planDates}`,
+        confirmText: 'Replace',
+        destructive: true,
+      })
+
+      if (!confirmed) return
+    }
+
+    navigation.navigate('Generating', { startDate: today })
+  }
 
   const weekday = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
@@ -55,7 +87,7 @@ export function TodayScreen() {
             </Text>
             <TouchableOpacity
               className="bg-primary py-4 px-8 rounded-xl"
-              onPress={() => navigation.navigate('Generating')}
+              onPress={handleGenerate}
             >
               <Text className="text-white text-base font-semibold">Generate Meal Plan</Text>
             </TouchableOpacity>

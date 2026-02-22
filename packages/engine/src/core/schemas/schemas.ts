@@ -59,6 +59,7 @@ export const SessionModificationSchema = z.object({
   action: z.enum(['regenerate-meal', 'regenerate-all']),
   mealId: z.string().optional(),
   reason: z.string(),
+  rejectedMeal: MealSchema.optional(),
 })
 
 export const SessionSchema = z.object({

@@ -190,3 +190,6 @@ export type LearnedPreferencesUpdate =
 export type DietaryRestrictionsUpdate =
   z.infer<typeof DietaryRestrictionsUpdateSchema>
 
+export type LearnedPreferences =
+  z.infer<typeof LearnedPreferencesSchema>
+

@@ -10,7 +10,9 @@ const config: Config = {
 
   moduleNameMapper: {
     '^@mealy/engine(.*)$': '<rootDir>/../engine/src$1',
-    '^@mealy/data(.*)$': '<rootDir>/../data/src$1'
+    '^@mealy/data(.*)$': '<rootDir>/../data/src$1',
+    '^@mealy/config$': '<rootDir>/src/tests/__mocks__/mealy-config.ts',
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   },
 
 

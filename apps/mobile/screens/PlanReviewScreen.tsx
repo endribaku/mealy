@@ -1,13 +1,15 @@
 import React from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RouteProp } from '@react-navigation/native'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSessionById } from '../api/sessions'
 import { deleteSession } from '../api/sessions'
+import { confirmSession } from '../api/mealPlans'
+import { confirmDialog } from '../lib/confirm-dialog'
 import type { MainStackParamList } from '../navigation/types'
-import type { Day } from '../api/types'
+import type { Day, ApiError } from '../api/types'
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'PlanReview'>
 type Route = RouteProp<MainStackParamList, 'PlanReview'>
@@ -43,7 +45,8 @@ function MealRow({ label, meal, onSwap }: {
 export function PlanReviewScreen() {
   const navigation = useNavigation<Nav>()
   const route = useRoute<Route>()
-  const { sessionId } = route.params
+  const queryClient = useQueryClient()
+  const { sessionId, startDate } = route.params
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['session', sessionId],
@@ -53,21 +56,44 @@ export function PlanReviewScreen() {
   const discardMutation = useMutation({
     mutationFn: () => deleteSession(sessionId),
     onSuccess: () => navigation.popToTop(),
+    onError: () => {
+      navigation.popToTop()
+    },
   })
 
-  const handleDiscard = () => {
-    Alert.alert(
-      'Discard Plan',
-      'Are you sure? Your draft meal plan will be lost.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Discard',
-          style: 'destructive',
-          onPress: () => discardMutation.mutate(),
-        },
-      ]
-    )
+  const confirmMutation = useMutation({
+    mutationFn: () => confirmSession(sessionId, startDate, true),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meal-plans'] })
+      queryClient.invalidateQueries({ queryKey: ['calendar'] })
+      navigation.replace('PlanSuccess', { startDate })
+    },
+    onError: async (error: ApiError) => {
+      if (error.status === 409) {
+        await confirmDialog({
+          title: 'Date Conflict',
+          message: 'These dates now overlap with another meal plan. Please go back and try again.',
+        })
+        navigation.popToTop()
+      } else {
+        await confirmDialog({
+          title: 'Error',
+          message: error.message ?? 'Failed to confirm plan.',
+        })
+      }
+    },
+  })
+
+  const handleDiscard = async () => {
+    const confirmed = await confirmDialog({
+      title: 'Discard Plan',
+      message: 'Are you sure? Your draft meal plan will be lost.',
+      confirmText: 'Discard',
+      destructive: true,
+    })
+    if (confirmed) {
+      discardMutation.mutate()
+    }
   }
 
   const handleSwapMeal = (dayNumber: number, mealType: string, mealName: string) => {
@@ -80,14 +106,6 @@ export function PlanReviewScreen() {
 
   const handleRegenerateAll = () => {
     navigation.navigate('RegenerateFull', { sessionId })
-  }
-
-  const handleConfirm = () => {
-    if (!session?.currentMealPlan) return
-    navigation.navigate('ConfirmPlan', {
-      sessionId,
-      numberOfDays: session.currentMealPlan.days.length,
-    })
   }
 
   if (isLoading) {
@@ -117,18 +135,16 @@ export function PlanReviewScreen() {
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-xl font-bold">Your Meal Plan</Text>
           <TouchableOpacity onPress={handleDiscard}>
-            <Text className="text-red-500 text-sm font-medium">Discard</Text>
+            <Text className="text-danger text-sm font-medium">Discard</Text>
           </TouchableOpacity>
         </View>
 
         <View className="bg-blue-50 rounded-xl p-4 mb-4">
           <View className="flex-row justify-between">
             <Text className="text-sm text-gray-600">{plan.days.length} days</Text>
+            <Text className="text-sm text-gray-600">Starts {startDate}</Text>
             <Text className="text-sm text-gray-600">
               ~{plan.nutritionSummary.avgDailyCalories} cal/day
-            </Text>
-            <Text className="text-sm text-gray-600">
-              ~{plan.nutritionSummary.avgProtein}g protein/day
             </Text>
           </View>
         </View>
@@ -160,9 +176,17 @@ export function PlanReviewScreen() {
       <View className="px-5 pb-6 pt-3 bg-white border-t border-gray-100">
         <TouchableOpacity
           className="bg-primary py-4 rounded-xl items-center mb-2"
-          onPress={handleConfirm}
+          onPress={() => confirmMutation.mutate()}
+          disabled={confirmMutation.isPending}
+          style={{ opacity: confirmMutation.isPending ? 0.6 : 1 }}
         >
-          <Text className="text-white text-base font-semibold">Confirm Plan</Text>
+          {confirmMutation.isPending ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="text-white text-base font-semibold">
+              Confirm Plan — Starting {startDate}
+            </Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           className="py-3 items-center"

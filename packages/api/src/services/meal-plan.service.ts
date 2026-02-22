@@ -1,4 +1,4 @@
-import { IDataAccess, MealPlan } from '@mealy/engine'
+import { IDataAccess, MealPlan, Meal, computeLearnedPreferences } from '@mealy/engine'
 import { ContextBuilder, MealPlanGenerator, GenerationOptions, IContextBuilder, IMealPlanGenerator } from '@mealy/engine'
 import { HttpError } from '../errors/http-error'
 import { SessionService } from './session.service'
@@ -51,6 +51,18 @@ export class MealPlanService {
         return session
     }
 
+
+	private findMealInPlan(mealPlan: MealPlan | undefined, mealId: string): Meal | null {
+		if (!mealPlan) return null
+		// mealId format from mobile: "day-{dayNumber}-{mealType}"
+		const match = mealId.match(/^day-(\d+)-(.+)$/)
+		if (!match) return null
+		const dayNumber = parseInt(match[1], 10)
+		const mealType = match[2] as 'breakfast' | 'lunch' | 'dinner'
+		const day = mealPlan.days.find(d => d.dayNumber === dayNumber)
+		if (!day || !day.meals[mealType]) return null
+		return day.meals[mealType]
+	}
 
 	private async ensureMealPlanOwnership(userId: string, planId: string) {
 
@@ -132,11 +144,13 @@ export class MealPlanService {
         )
 
         // 💾 Only after AI success → persist mutation
+        const rejectedMeal = this.findMealInPlan(session.currentMealPlan, mealId)
 
         await this.dataAccess.addSessionModification(sessionId, {
             action: 'regenerate-meal',
             mealId,
-            reason
+            reason,
+            rejectedMeal: rejectedMeal ?? undefined
         })
 
 		await this.dataAccess.updateSessionMealPlan(
@@ -201,7 +215,7 @@ export class MealPlanService {
 	// CONFIRM PLAN
 	// ============================================================
 
-	async confirmMealPlan(userId: string, sessionId: string, startDate?: string) {
+	async confirmMealPlan(userId: string, sessionId: string, startDate?: string, replaceConflicting?: boolean) {
 
 		const session = await this.ensureSessionOwnership(userId, sessionId)
 
@@ -222,10 +236,17 @@ export class MealPlanService {
 			)
 
 			if (hasOverlap) {
-				throw new HttpError(
-					'Date range overlaps with an existing meal plan. Choose different dates.',
-					409
-				)
+				if (!replaceConflicting) {
+					throw new HttpError(
+						'Date range overlaps with an existing meal plan. Choose different dates.',
+						409
+					)
+				}
+
+				const overlapping = await this.dataAccess.findMealPlansByDateRange(userId, startDate, endDateStr)
+				for (const plan of overlapping) {
+					await this.dataAccess.deleteMealPlan(plan.id)
+				}
 			}
 		}
 
@@ -240,7 +261,24 @@ export class MealPlanService {
 			'confirmed'
 		)
 
-		return await this.dataAccess.findSessionById(sessionId)
+		const confirmedSession = await this.dataAccess.findSessionById(sessionId)
+
+		// Non-blocking: trigger preference learning in the background
+		this.runPreferenceLearning(userId).catch(() => {})
+
+		return confirmedSession
+	}
+
+	private async runPreferenceLearning(userId: string): Promise<void> {
+		const confirmedPlans = await this.dataAccess.findMealPlansByUserId(userId)
+		const allSessions = await this.dataAccess.findSessionsByUserId(userId)
+		const confirmedSessions = allSessions.filter(s => s.status === 'confirmed')
+
+		const result = computeLearnedPreferences({ confirmedPlans, confirmedSessions })
+
+		if (result.shouldUpdate && result.preferences) {
+			await this.dataAccess.updateLearnedPreferences(userId, result.preferences)
+		}
 	}
 
 	// ============================================================

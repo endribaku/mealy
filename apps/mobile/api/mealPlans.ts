@@ -86,10 +86,18 @@ export async function regenerateSingleMeal(
 }
 
 // POST /meal-plans/sessions/:sessionId/confirm
-export async function confirmSession(sessionId: string, startDate?: string) {
+export async function confirmSession(
+  sessionId: string,
+  startDate?: string,
+  replaceConflicting?: boolean
+) {
+  const body: Record<string, unknown> = {}
+  if (startDate) body.startDate = startDate
+  if (replaceConflicting) body.replaceConflicting = true
+
   const res = await api.post<ApiResponse<ConfirmMealPlanResponseData>>(
     `/meal-plans/sessions/${sessionId}/confirm`,
-    startDate ? { startDate } : {}
+    body
   )
 
   return res.data.data

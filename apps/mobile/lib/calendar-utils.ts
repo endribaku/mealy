@@ -1,5 +1,12 @@
 import type { StoredMealPlan, Day } from '../api/types'
 
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /**
  * Maps a calendar date to a meal plan's dayNumber.
  * Returns null if the date falls outside the plan's range.
@@ -58,7 +65,7 @@ export function buildMarkedDates(
     const end = new Date(plan.endDate + 'T00:00:00')
 
     while (current <= end) {
-      const key = current.toISOString().split('T')[0]
+      const key = formatLocalDate(current)
       marked[key] = { planId: plan.id }
       current.setDate(current.getDate() + 1)
     }
@@ -80,7 +87,7 @@ export function getLastDayOfMonth(yearMonth: string): string {
  * Returns today's date as "YYYY-MM-DD".
  */
 export function getTodayString(): string {
-  return new Date().toISOString().split('T')[0]
+  return formatLocalDate(new Date())
 }
 
 /**
@@ -91,4 +98,23 @@ export function getCurrentMonth(): string {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   return `${year}-${month}`
+}
+
+/**
+ * Returns existing plans that overlap with a proposed date range.
+ * Uses standard interval overlap: plan.start <= rangeEnd AND plan.end >= rangeStart.
+ */
+export function findOverlappingPlans(
+  plans: StoredMealPlan[],
+  startDate: string,
+  numberOfDays: number = 7
+): StoredMealPlan[] {
+  const end = new Date(startDate + 'T00:00:00')
+  end.setDate(end.getDate() + numberOfDays - 1)
+  const endStr = formatLocalDate(end)
+
+  return plans.filter(p =>
+    p.startDate && p.endDate &&
+    p.startDate <= endStr && p.endDate >= startDate
+  )
 }

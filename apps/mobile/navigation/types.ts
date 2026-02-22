@@ -22,11 +22,10 @@ export type TabParamList = {
 
 export type MainStackParamList = {
   Tabs: undefined
-  Generating: undefined
-  PlanReview: { sessionId: string }
+  Generating: { startDate: string }
+  PlanReview: { sessionId: string; startDate: string }
   RegenerateMeal: { sessionId: string; mealId: string; mealName: string }
   RegenerateFull: { sessionId: string }
-  ConfirmPlan: { sessionId: string; numberOfDays: number }
   PlanSuccess: { startDate: string }
   MealDetail: { planId: string; dayNumber: number; mealType: 'breakfast' | 'lunch' | 'dinner' }
   PlanHistory: undefined

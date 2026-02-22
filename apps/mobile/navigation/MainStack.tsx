@@ -5,7 +5,6 @@ import { GeneratingScreen } from '../screens/GeneratingScreen'
 import { PlanReviewScreen } from '../screens/PlanReviewScreen'
 import { RegenerateMealScreen } from '../screens/RegenerateMealScreen'
 import { RegenerateFullScreen } from '../screens/RegenerateFullScreen'
-import { ConfirmPlanScreen } from '../screens/ConfirmPlanScreen'
 import { PlanSuccessScreen } from '../screens/PlanSuccessScreen'
 import type { MainStackParamList } from './types'
 
@@ -42,11 +41,6 @@ export function MainStack() {
         name="RegenerateFull"
         component={RegenerateFullScreen}
         options={{ presentation: 'modal', title: 'Regenerate' }}
-      />
-      <Stack.Screen
-        name="ConfirmPlan"
-        component={ConfirmPlanScreen}
-        options={{ title: 'Choose Start Date' }}
       />
       <Stack.Screen
         name="PlanSuccess"

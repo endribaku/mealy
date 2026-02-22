@@ -57,11 +57,13 @@ export type {
   User,
   UserProfileUpdate,
   LearnedPreferencesUpdate,
+  LearnedPreferences,
   DietaryRestrictionsUpdate
 } from './core/schemas/user-schemas.js'
 
 export type {
   Session,
+  Meal,
   MealPlan,
   StoredMealPlan
 } from './core/schemas/schemas.js'
@@ -73,3 +75,17 @@ export {
 export {
   SessionSchema
 } from './core/schemas/schemas.js'
+
+
+// ============================================================
+// PREFERENCE LEARNING
+// ============================================================
+
+export {
+  computeLearnedPreferences
+} from './core/learning/preference-learner.js'
+
+export type {
+  LearningInput,
+  LearningResult
+} from './core/learning/preference-learner.js'

@@ -1,21 +1,28 @@
 import React, { useEffect, useRef } from 'react'
 import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import type { RouteProp } from '@react-navigation/native'
 import { useMutation } from '@tanstack/react-query'
 import { generateMealPlan } from '../api/mealPlans'
 import type { MainStackParamList } from '../navigation/types'
 
 type Nav = NativeStackNavigationProp<MainStackParamList, 'Generating'>
+type Route = RouteProp<MainStackParamList, 'Generating'>
 
 export function GeneratingScreen() {
   const navigation = useNavigation<Nav>()
+  const route = useRoute<Route>()
+  const { startDate } = route.params
   const hasStarted = useRef(false)
 
   const mutation = useMutation({
     mutationFn: () => generateMealPlan(),
     onSuccess: (data) => {
-      navigation.replace('PlanReview', { sessionId: data.session.id })
+      navigation.replace('PlanReview', {
+        sessionId: data.session.id,
+        startDate,
+      })
     },
   })
 

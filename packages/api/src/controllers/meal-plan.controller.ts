@@ -172,7 +172,7 @@ export class MealPlanController {
 		req: Request<
 			{ sessionId: string },
 			BasicSuccessResponse<{ session: Session }>,
-			{ startDate?: string }
+			{ startDate?: string; replaceConflicting?: boolean }
 		>,
 		res: Response,
 		next: NextFunction
@@ -180,19 +180,21 @@ export class MealPlanController {
 		try {
 			const userId = (req as any).user.id
 			const { sessionId } = req.params
-			const { startDate } = req.body
+			const { startDate, replaceConflicting } = req.body
 
 			logger.info({
 				event: 'meal_plan_confirm_requested',
 				userId,
 				sessionId,
-				startDate
+				startDate,
+				replaceConflicting
 			})
 
 			const session = await this.service.confirmMealPlan(
 				userId,
 				sessionId,
-				startDate
+				startDate,
+				replaceConflicting
 			)
 
 			logger.info({

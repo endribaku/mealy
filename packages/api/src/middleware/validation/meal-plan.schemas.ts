@@ -42,7 +42,8 @@ export const RegenerateFullBodySchema = z.object({
 // ============================================================
 
 export const ConfirmPlanBodySchema = z.object({
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD format').optional()
+	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD format').optional(),
+	replaceConflicting: z.boolean().optional(),
 }).strict()
 
 // ============================================================
